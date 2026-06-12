@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip --version)",
+      "Bash(nvidia-smi)",
+      "Bash(nvcc --version)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(python3:*)",
+      "Bash(vllm serve:*)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(break)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -s --max-time 5 http://localhost:8000/health)",
+      "Bash(curl -s --max-time 120 http://localhost:8000/health)",
+      "Bash(curl:*)",
+      "Bash(NO_PROXY=\"*\" no_proxy=\"*\" curl -s --noproxy '*' --max-time 300 http://127.0.0.1:8000/health)",
+      "Bash(nvidia-smi --query-compute-apps=pid,name,used_memory --format=csv,noheader)",
+      "Bash(NO_PROXY=\"*\" no_proxy=\"*\" curl:*)",
+      "Bash(kill -9 10048 10005 9985)",
+      "Bash(fuser -k 8000/tcp)",
+      "Bash(fuser 8000/tcp)",
+      "Bash(nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader,nounits)",
+      "Bash(NO_PROXY=\"*\" curl --noproxy '*' -s --max-time 5 http://127.0.0.1:8000/health)",
+      "Bash(NO_PROXY=\"*\" python3 04_continuous_batching.py --concurrency 1 5 10 20 40 --num-requests 40 --max-tokens 32)",
+      "Bash(nvidia-smi --query-compute-apps=pid,name --format=csv,noheader)",
+      "Bash(kill -9 20916)",
+      "Bash(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits)"
+    ]
+  }
+}
