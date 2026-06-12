@@ -11,7 +11,6 @@ status: in-progress
 related:
   - "[[SGLang与vLLM推理框架对比分享]]"
 ---
-
 # 📚 SGLang vs vLLM 学习日志 — 4月25日 周六
 
 > **距技术分享还有 71 天** | **阶段：M1 基础认知** | **Week 1/10**
@@ -21,6 +20,7 @@ related:
 ## 📍 本周阶段
 
 **Week 1：环境搭建 + vLLM 上手**
+
 > 本周目标：vLLM 能跑起来，理解 PagedAttention 核心思想
 
 ---
@@ -69,14 +69,14 @@ related:
 
 ## 📅 本周进度一览
 
-| 日期 | 任务 | 状态 |
-|------|------|------|
-| 4/22 周三 | 读 vLLM 原始论文（PagedAttention），记核心笔记 | ☐ |
-| 4/23 周四 | 安装 vLLM，用 Qwen2.5-1.5B 跑通基础推理 | ☐ |
-| 4/24 周五 | 体验 Continuous Batching，调参数 | ☐ |
+| 日期                | 任务                                                            | 状态                |
+| ------------------- | --------------------------------------------------------------- | ------------------- |
+| 4/22 周三           | 读 vLLM 原始论文（PagedAttention），记核心笔记                  | ☐                  |
+| 4/23 周四           | 安装 vLLM，用 Qwen2.5-1.5B 跑通基础推理                         | ☐                  |
+| 4/24 周五           | 体验 Continuous Batching，调参数                                | ☐                  |
 | **4/25 周六** | **📖 读 vLLM 架构文档，画 PagedAttention 内存管理流程图** | **⬅️ 今天** |
-| 4/26 周日 | 体验 Prefix Caching（APC），对比性能 | ☐ |
-| 4/28 周一 | 整理本周笔记，写"vLLM 初体验" | ☐ |
+| 4/26 周日           | 体验 Prefix Caching（APC），对比性能                            | ☐                  |
+| 4/28 周一           | 整理本周笔记，写"vLLM 初体验"                                   | ☐                  |
 
 ---
 
@@ -109,19 +109,23 @@ related:
 ```
 
 ### 图上要标注的 4 个要点
+
 1. **逻辑连续、物理离散**：Block Table 是翻译层，attention kernel 按表间接寻址
 2. **按需分配**：永远只欠一个块，浪费 = 最后一个块的空格
 3. **共享与 CoW**：beam search 多分支指向同一物理块，引用计数 >1 时写入先复制
 4. **空闲池**：分配/释放都是 O(1) 的链表操作，没有碎片整理
 
 ### 显存预算心算公式
+
 ```
 KV bytes = 2(K和V) × layers × kv_heads × head_dim × dtype字节 × tokens
 例 Qwen2.5-7B (28层, 4 KV头 GQA, head_dim 128, fp16):
   每 token ≈ 2×28×4×128×2 B ≈ 57 KB → 1 万 token ≈ 0.57 GB
 ```
+
 这解释了为什么 `--max-model-len` 直接决定能开多大并发。
 
 ### 自测题
+
 1. 为什么传统方案的"外部碎片"在 PagedAttention 中消失了？（所有块同尺寸，任何空闲块都能用）
 2. swap-out 换出到 CPU 时搬的是什么？（该序列 Block Table 指向的所有物理块内容）
