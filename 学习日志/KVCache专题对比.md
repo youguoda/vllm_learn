@@ -134,8 +134,29 @@ R1=SYS+(10,11) → R2=SYS+(20,21) 在第5token split → R3=SYS+(10,99) 在第1t
 
 ---
 
+## 8. 社区验证（交叉验证详见 [[社区数据交叉验证]]）
+
+> "On unique-prompt workloads, SGLang and vLLM are **near-parity**. The gap opens up specifically when shared prefixes are present, and compounds with concurrency."
+> — 2026 独立评测（H100, Llama3.1-8B, ShareGPT）
+
+与本实验对比：**完全一致**。我的 0% 复用率 RPS 7.31/7.08（持平），100% 复用率 8.88/18.95（拉开）。社区在不同硬件上验证了同样趋势。
+
+> "SGLang delivers **29% higher throughput** on H100s (ShareGPT) and **up to 6.4×** on prefix-heavy workloads."
+> — LMSYS / 2026 评测
+
+我的 2.1× 落在这个区间内（ShareGPT 混合复用 29% ~ 极端前缀重 6.4× 之间），符合"100% 纯复用"的预期。
+
+> "PagedAttention based FlashInfer prefill kernels are up to **42% slower** than non-paged kernels."
+> — vAttention 论文 (Microsoft, 2024)
+
+印证了误区②③：PagedAttention 省显存但间接寻址拖慢 kernel——它的价值在显存利用率，不在计算速度。
+
+**外推边界**：趋势（复用率决定选型）跨硬件成立；但具体倍数（2.1×）是 3060+1.5B+100% 复用的特例，大模型/多卡请参考社区 29%~6.4× 区间。
+
+---
+
 ## 今日产出
 
-- [x] KVCache专题对比.md（完整，带源码引用 + 实验数字）
+- [x] KVCache专题对比.md（完整，带源码引用 + 实验数字 + 社区验证）
 - [x] assets/selection_guide.png（选型决策树）
 - [x] 自测题书面回答（链式哈希为何必要）
