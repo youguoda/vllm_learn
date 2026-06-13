@@ -159,8 +159,12 @@ if __name__ == "__main__":
 | 哈希计算 | 链式 hash() | 不需要（树结构本身保证唯一性） |
 
 ## 今日产出
-- [ ] 真实源码路径（记进笔记）
-- [ ] TreeNode 字段注释
-- [ ] match_prefix / insert / evict 逐行注释
-- [ ] tiny_radix.py 运行结果（树结构正确分叉）
-- [ ] vLLM vs SGLang 差异对照表
+- [x] 真实源码路径（radix_cache.py: RadixKey:56/TreeNode:201/match:337/insert:397/split:648/evict:537）
+- [x] TreeNode 字段注释（children/parent/value/lock_ref/last_access_time/host_value，对照 vLLM）
+- [x] match_prefix / insert / evict 逐行注释（走到走不动 + 任意位置split + 堆LRU + 路径锁）
+- [x] tiny_radix.py 运行结果（两次 split 在第5、第1个token处，SYS 公共边只出现一次）
+- [x] vLLM vs SGLang 差异对照表（10 维度）
+
+> 完成于 2026-06-14。完整笔记：[[SGLang源码精读-RadixAttention-06-14]]
+> 核心顿悟：vLLM 用哈希表(精确查找)，SGLang 用 radix 树(最长前缀匹配)——数据结构选择决定缓存粒度。
+> 额外发现：RadixKey.extra_key 就是 06-13 实验 --salt 隔离缓存的底层；match() 用指数搜索+二分优化长前缀。
