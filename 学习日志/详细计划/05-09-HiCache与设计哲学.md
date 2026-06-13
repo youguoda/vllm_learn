@@ -91,6 +91,11 @@ NO_PROXY="*" python3 -m sglang.launch_server \
 3. 前缀复用率高（搬回来的 KV 还有人用，不是白搬）
 
 ## 今日产出
-- [ ] exp_evict.py 运行结果（观察到淘汰现象）
-- [ ] HiCache 博客四问四答笔记
-- [ ] KVCache设计哲学.md（两类比 + 两者关系）
+- [x] exp_evict.py 运行结果（轻压力重放命中27ms vs 重压力重放271ms=淘汰重算）
+- [x] HiCache 四问四答（+ 源码 host_value/_evict_backuped/load_back 印证）
+- [x] KVCache设计哲学（虚拟内存观 vs 缓存系统观 + 两者不对立）→ [[KVCache设计哲学-HiCache-06-14]]
+
+> 完成于 2026-06-14。
+> ★实测踩坑：HiCache 默认 io-backend=kernel 在 WSL2+RTX3060 崩(CUDA illegal access)，
+>   必须加 --hicache-io-backend direct 才能跑通。跑通后重放首条 45ms=CPU 救援成功。
+> ★核心哲学：vLLM把KV当内存管(够用就行)，SGLang把KV当宝贝护(放不下降级CPU也不丢)。

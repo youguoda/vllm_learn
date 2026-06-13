@@ -74,6 +74,8 @@ Model (Qwen2.5-1.5B): ~3 GiB VRAM. With `max_model_len=4096`: KV cache ~6 GiB, C
 - `verify_hash.py` — replicates vLLM chained block hash (`hash_block_tokens`) to demonstrate "change 1 token → all downstream block hashes invalidate". Pure CPU, no server needed. Companion to the M2 source-reading note.
 - `tiny_radix.py` — minimal radix tree replicating SGLang's `_split_node`. Inserts 3 requests, shows two splits at arbitrary token positions (proving token-level vs vLLM's 16-token-block granularity). Pure CPU. Companion to the SGLang source-reading note.
 - `draw_arch.py` — renders 3 PPT diagrams to `assets/`: pagedattention_arch.png, radixattention_arch.png, kvcache_diff.png. Arrows labelled with real source fn names; diff chart uses measured data. Chinese via WenQuanYi Zen Hei font. Run with base-env python (has matplotlib).
+- `exp_evict.py` — SGLang radix-tree eviction observer (args: n_prefix char_len). Fills cache with distinct long prefixes, replays to see hit/evict. Heavy load (80 3000) shows evicted KV = recompute.
+- **HiCache (SGLang hierarchical cache)**: `--enable-hierarchical-cache --hicache-ratio 1.5`. ⚠️ On WSL2/RTX3060 the default `--hicache-io-backend kernel` crashes (CUDA illegal access); MUST use `--hicache-io-backend direct`. Host pool needs free CPU RAM ≈ GPU_KV × ratio.
 - `论文笔记-PagedAttention-vLLM.md` — PagedAttention paper notes (vLLM's core innovation)
 - `SGLang与vLLM推理框架对比分享.md` — Tech talk outline: SGLang vs vLLM comparison (July 2026)
 - `学习日志/` — Daily learning logs (04-22 through 06-09, covering both SGLang and vLLM)
