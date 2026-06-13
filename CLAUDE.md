@@ -69,6 +69,8 @@ Model (Qwen2.5-1.5B): ~3 GiB VRAM. With `max_model_len=4096`: KV cache ~6 GiB, C
 - `06_prefix_caching.py` — APC (Automatic Prefix Caching) experiment: shared long system prompt + varied questions, measures TTFT cold vs warm, scrapes `vllm:prefix_cache_{queries,hits}_total` for hit rate. Flags: `--prefix-repeat`, `--random-prefix`, `--salt`
 - `07_radix_attention.py` — SGLang multi-turn dialog experiment (port 30000): same system prompt + growing history, measures per-turn TTFT across 3 prefix lengths. Needs SGLang server running.
 - `exp_partial_prefix.py` / `exp_partial_prefix_sglang.py` — half-block-aligned prefix experiment, vLLM (8000) vs SGLang (30000). Shows token-level (page_size=1) vs block-level (block_size=16) cache granularity. Read `#cached-token` from SGLang log for hit evidence.
+- `08_structured_output.py` — SGLang JSON schema constrained decoding (port 30000): unconstrained vs schema (0%→100% valid), nested schema + enum, adversarial "write poetry" prompt. Uses OpenAI `response_format` json_schema. xgrammar backend compiles schema→FSM (~0.28s first call).
+- `09_compare_bench.py` — framework-agnostic vLLM↔SGLang benchmark (OpenAI streaming API, `--base-url`/`--tag`). Outputs `bench_<tag>.csv`. Run one framework at a time (GPU exclusive). `plot_compare.py` renders `assets/compare_v1.png`. NOTE: tok/s not directly comparable (gen length differs); RPS is fairer.
 - `论文笔记-PagedAttention-vLLM.md` — PagedAttention paper notes (vLLM's core innovation)
 - `SGLang与vLLM推理框架对比分享.md` — Tech talk outline: SGLang vs vLLM comparison (July 2026)
 - `学习日志/` — Daily learning logs (04-22 through 06-09, covering both SGLang and vLLM)
