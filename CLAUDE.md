@@ -30,6 +30,12 @@ python3 03_params.py
 # Continuous batching benchmark (server must be running)
 HF_HUB_OFFLINE=1 NO_PROXY="*" vllm serve Qwen/Qwen2.5-1.5B --max-model-len 4096 --gpu-memory-utilization 0.85
 NO_PROXY="*" python3 04_continuous_batching.py --concurrency 1 5 10 20 --num-requests 40
+
+# Official benchmark (vllm bench serve) — saves JSON to bench_results/
+HF_HUB_OFFLINE=1 NO_PROXY="*" vllm bench serve --backend openai --model Qwen/Qwen2.5-1.5B \
+  --dataset-name random --random-input-len 512 --random-output-len 128 \
+  --max-concurrency 8 --num-prompts 64 --seed 42 \
+  --save-result --result-dir bench_results --result-filename bench_c8.json
 ```
 
 ## WSL2 Caveats
