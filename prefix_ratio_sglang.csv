@@ -1,0 +1,6 @@
+framework,prefix_ratio,ttft_avg_ms,ttft_p95_ms,rps
+sglang,0.0,192.0,248.0,7.08
+sglang,0.25,147.9,190.0,7.51
+sglang,0.5,149.5,237.6,7.45
+sglang,0.75,88.3,111.3,8.05
+sglang,1.0,39.9,48.5,18.95

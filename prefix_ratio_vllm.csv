@@ -1,0 +1,6 @@
+framework,prefix_ratio,ttft_avg_ms,ttft_p95_ms,rps
+vllm,0.0,197.8,256.4,7.31
+vllm,0.25,147.9,193.9,7.61
+vllm,0.5,133.5,162.8,7.88
+vllm,0.75,93.6,120.9,8.21
+vllm,1.0,44.0,47.3,8.88
