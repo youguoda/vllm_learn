@@ -73,6 +73,7 @@ Model (Qwen2.5-1.5B): ~3 GiB VRAM. With `max_model_len=4096`: KV cache ~6 GiB, C
 - `09_compare_bench.py` — framework-agnostic vLLM↔SGLang benchmark (OpenAI streaming API, `--base-url`/`--tag`). Outputs `bench_<tag>.csv`. Run one framework at a time (GPU exclusive). `plot_compare.py` renders `assets/compare_v1.png`. NOTE: tok/s not directly comparable (gen length differs); RPS is fairer.
 - `verify_hash.py` — replicates vLLM chained block hash (`hash_block_tokens`) to demonstrate "change 1 token → all downstream block hashes invalidate". Pure CPU, no server needed. Companion to the M2 source-reading note.
 - `tiny_radix.py` — minimal radix tree replicating SGLang's `_split_node`. Inserts 3 requests, shows two splits at arbitrary token positions (proving token-level vs vLLM's 16-token-block granularity). Pure CPU. Companion to the SGLang source-reading note.
+- `draw_arch.py` — renders 3 PPT diagrams to `assets/`: pagedattention_arch.png, radixattention_arch.png, kvcache_diff.png. Arrows labelled with real source fn names; diff chart uses measured data. Chinese via WenQuanYi Zen Hei font. Run with base-env python (has matplotlib).
 - `论文笔记-PagedAttention-vLLM.md` — PagedAttention paper notes (vLLM's core innovation)
 - `SGLang与vLLM推理框架对比分享.md` — Tech talk outline: SGLang vs vLLM comparison (July 2026)
 - `学习日志/` — Daily learning logs (04-22 through 06-09, covering both SGLang and vLLM)
