@@ -58,6 +58,7 @@ Model (Qwen2.5-1.5B): ~3 GiB VRAM. With `max_model_len=4096`: KV cache ~6 GiB, C
 - `03_params.py` — Parameter exploration benchmarks
 - `04_continuous_batching.py` — Continuous batching benchmark (concurrent API requests, measures RPS/TTFT/latency)
 - `05_kvcache_blocks_scan.py` — PagedAttention block scan: starts server across (max_len, gpu_util) configs, scrapes `num_gpu_blocks` from `/metrics`, verifies 显存→block→并发 chain
+- `06_prefix_caching.py` — APC (Automatic Prefix Caching) experiment: shared long system prompt + varied questions, measures TTFT cold vs warm, scrapes `vllm:prefix_cache_{queries,hits}_total` for hit rate. Flags: `--prefix-repeat`, `--random-prefix`, `--salt`
 - `论文笔记-PagedAttention-vLLM.md` — PagedAttention paper notes (vLLM's core innovation)
 - `SGLang与vLLM推理框架对比分享.md` — Tech talk outline: SGLang vs vLLM comparison (July 2026)
 - `学习日志/` — Daily learning logs (04-22 through 06-09, covering both SGLang and vLLM)
