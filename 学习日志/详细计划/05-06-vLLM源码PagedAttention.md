@@ -122,8 +122,11 @@ free_blocks() → ref_count=0 → 归还 free_list（哈希保留）
 ```
 
 ## 今日产出
-- [ ] 真实源码文件路径（记进笔记）
-- [ ] Block 数据结构字段注释
-- [ ] allocate/free 逐行注释
-- [ ] verify_hash.py 运行结果（两块哈希都变）
-- [ ] 流程图标注函数名版本
+- [x] 真实源码文件路径（kv_cache_utils.py / block_pool.py / kv_cache_manager.py + 行号）
+- [x] Block 数据结构字段注释（纠正计划 3 处字段名：ref_cnt / _block_hash / prev-next_free_block）
+- [x] allocate/free 逐行注释（先查缓存→补free list→满块算哈希；free 只减ref_cnt不碰哈希）
+- [x] verify_hash.py 运行结果（改1token两块哈希全变✓，部分命中[True,True,False]✓）
+- [x] 流程图标注函数名版本
+
+> 完成于 2026-06-14。完整笔记：[[vLLM源码精读-PagedAttention内存管理-06-14]]
+> 核心顿悟：PagedAttention = 操作系统页分配器（free list/引用计数/LRU/COW/惰性失效一一对应）。
