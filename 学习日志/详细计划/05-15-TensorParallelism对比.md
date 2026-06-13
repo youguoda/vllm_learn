@@ -119,7 +119,9 @@ Attention 部分（QKV + out proj）：
 自测：为什么 TP 数 N 越大，通信开销越大但也越必要？（显存减少 N 倍，但通信量 ∝ (N-1)/N 接近常数——超过单卡显存限制时不得不用 TP）
 
 ## 今日产出
-- [ ] Column/RowParallelLinear 代码注释（含 all_reduce 行号）
-- [ ] verify_tp.py 运行结果（误差 ≈ 1e-6）
-- [ ] vLLM vs SGLang TP 对比表
-- [ ] 通信量推导（手算）
+- [x] Column/RowParallelLinear 代码注释（all_reduce 在 linear.py:1559）
+- [x] verify_tp.py 运行结果（误差 9.5e-7/4.8e-7，数学无损）
+- [x] vLLM vs SGLang TP 对比表（Megatron 范式一致）
+- [x] 通信量推导（Qwen2.5-7B TP=4 ≈ 9.6MB/step）
+
+> 完成于 2026-06-14。→ [[TensorParallelism对比-06-14]]。TP 是两框架共享的 Megatron 底座，数学无损，非区别点。
