@@ -68,6 +68,8 @@ R3: [系统提示S] + "分析轴承寿命"
 一句话写出：vLLM 哈希按**16-token 块**为粒度、必须整块对齐才命中；SGLang radix 树按**token 前缀**为粒度、任意长度都能命中，代价是树的维护和锁开销。再对照步骤 1 第 3 条请求的数据验证。
 
 ## 今日产出
-- [ ] exp_partial_prefix.py 三条 TTFT 数据
-- [ ] 论文笔记（四问四答）
-- [ ] 手画 radix 树演化图
+- [x] exp_partial_prefix.py 三条 TTFT 数据（A冷456ms / A重复28ms命中99.6% / B截断32ms命中82.1%）
+- [x] 论文笔记（四问四答）→ 见 [[SGLang论文-RadixAttention精读-06-13]]
+- [x] 手画 radix 树演化图（R1整边 → R2 split"S分析" → R3再split"轴承" → LRU叶子优先淘汰）
+
+> 完成于 2026-06-13。完整笔记：`学习日志/SGLang论文-RadixAttention精读-06-13.md`
