@@ -62,6 +62,8 @@ NO_PROXY="*" curl -s http://localhost:30000/v1/chat/completions \
 `学习日志/SGLang安装笔记.md`：环境隔离方式、完整命令、每个报错+解法、参数对照表、KV 池对比数字。
 
 ## 今日产出
-- [ ] SGLang 服务可用（health + chat 都通）
-- [ ] 安装笔记（含踩坑）
-- [ ] vLLM/SGLang 参数对照表 + KV 容量对比
+- [x] SGLang 服务可用（health 200 + chat 都通）— sglang 0.5.13 @ venv-sglang
+- [x] 安装笔记（含踩坑）→ 见 [[SGLang安装笔记]]
+- [x] vLLM/SGLang 参数对照表 + KV 容量对比（SGLang 212,918 vs vLLM 205,808 tokens @ 0.80）
+
+> 完成于 2026-06-13。独立 venv `~/venv-sglang` 隔离，与基础环境 vLLM 互不干扰。完整笔记：`学习日志/SGLang安装笔记.md`

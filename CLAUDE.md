@@ -10,7 +10,9 @@ vLLM learning/exploration project. Goal: build deep technical understanding of L
 
 - **GPU**: NVIDIA RTX 3060 12GB (WSL2)
 - **CUDA**: Driver 13.1, Toolkit 12.4
-- **Python**: 3.12, vLLM 0.22.1
+- **Python**: 3.12
+- **vLLM 0.22.1** — base env `/home/guoda/python` (port 8000)
+- **SGLang 0.5.13** — isolated venv `~/venv-sglang` (port 30000); `source ~/venv-sglang/bin/activate` first. Kept separate to avoid torch/flashinfer/kernel conflicts. Single 12GB card runs one at a time.
 
 ## Running Scripts
 
