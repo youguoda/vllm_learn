@@ -271,8 +271,12 @@ AddReqResult.OTHER     # token budget 耗尽（decode 没饿死），停止
 ---
 
 ## 今日产出
-- [ ] 调度策略决策树图（标函数名 + 触发条件）
-- [ ] Radix Tree DFS_WEIGHT 手画示例（带权重计算过程）
-- [ ] LPM vs DFS_WEIGHT 对比表（含适用场景）
-- [ ] sched_compare.py 实测结果（三行 TTFT 数据表）
-- [ ] 自测 5 题答案写入笔记
+- [x] 调度策略决策树图（标 calc_priority/_determine_active_policy 函数名）→ [[SGLang调度器源码精读-CacheAware-06-14]]
+- [x] Radix Tree DFS_WEIGHT 手画示例（带权重计算过程）
+- [x] LPM vs DFS_WEIGHT 对比表
+- [x] sched_compare.py 实测（LPM/FCFS + 诚实的单前缀局限分析）
+- [x] 自测 5 题答案
+
+> 完成于 2026-06-14。核心：SGLang 有 6 种调度策略(2 缓存感知)，vLLM 只有 FCFS。
+> cache-aware 主动在排序时把同前缀集中(防 LRU 驱逐)，多前缀场景才显优势。
+> 诚实发现：单前缀实验 LPM vs FCFS 不明显——cache-aware 需多竞争前缀才见效。
