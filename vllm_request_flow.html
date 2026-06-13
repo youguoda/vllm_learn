@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>vLLM 请求流转详细流程图</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-bottom: 1px solid #30363d;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 20px; font-weight: 700; color: #58a6ff; }
+  header p { font-size: 13px; color: #8b949e; margin-top: 2px; }
+  .badge {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: #8b949e;
+  }
+
+  .layout {
+    display: flex;
+    height: calc(100vh - 65px);
+  }
+
+  /* ===== LEFT: FLOW DIAGRAM ===== */
+  .flow-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    position: relative;
+  }
+
+  .process-boundary {
+    border: 2px dashed;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .process-label {
+    position: absolute;
+    top: -11px;
+    left: 16px;
+    background: #0d1117;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .boundary-frontend { border-color: #1f6feb; }
+  .boundary-frontend .process-label { color: #58a6ff; }
+  .boundary-backend  { border-color: #238636; }
+  .boundary-backend  .process-label { color: #3fb950; }
+  .boundary-gpu      { border-color: #9e6a03; }
+  .boundary-gpu      .process-label { color: #d29922; }
+
+  /* Node cards */
+  .node {
+    background: #161b22;
+    border: 1.5px solid #30363d;
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin: 6px 0;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+  }
+  .node:hover { border-color: #58a6ff; transform: translateX(4px); background: #1c2129; }
+  .node.active { border-color: #58a6ff; background: #1c2836; box-shadow: 0 0 0 1px #58a6ff33; }
+
+  .node-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .icon-client   { background: #21262d; }
+  .icon-engine   { background: #0c2a4e; }
+  .icon-input    { background: #0c2a4e; }
+  .icon-zmq      { background: #1a1f2e; border: 1px solid #3d4454; }
+  .icon-sched    { background: #0c2e14; }
+  .icon-block    { background: #0c2e14; }
+  .icon-gpu      { background: #2e1a00; }
+  .icon-attn     { background: #2e1a00; }
+  .icon-sample   { background: #2e1a00; }
+  .icon-output   { background: #0c2a4e; }
+  .icon-decode   { background: #1c1033; }
+
+  .node-main { flex: 1; min-width: 0; }
+  .node-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+  .node-sub   { font-size: 12px; color: #8b949e; line-height: 1.5; }
+  .node-class {
+    font-size: 10px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: #79c0ff;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    white-space: nowrap;
+    margin-top: 4px;
+    display: inline-block;
+  }
+
+  /* Arrow connectors */
+  .arrow {
+    display: flex;
+    align-items: center;
+    margin: 0 0 0 30px;
+    height: 20px;
+    gap: 8px;
+  }
+  .arrow-line {
+    width: 2px;
+    height: 20px;
+    background: #30363d;
+    margin-left: 17px;
+  }
+  .arrow-label {
+    font-size: 10px;
+    color: #6e7681;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    margin-left: 8px;
+    margin-top: -10px;
+  }
+
+  .arrow-zmq {
+    border: 1px dashed #3d4454;
+    border-radius: 4px;
+    padding: 4px 12px;
+    margin: 4px 0 4px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #6e7681;
+  }
+  .arrow-zmq::before { content: '⇢'; font-size: 16px; color: #484f58; }
+
+  .loop-indicator {
+    border: 1.5px solid #6e40c9;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 6px 0;
+    background: #1c1033;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #bc8cff;
+  }
+  .loop-indicator .loop-icon { font-size: 18px; }
+
+  /* ===== RIGHT: DETAIL PANEL ===== */
+  .detail-panel {
+    width: 400px;
+    background: #161b22;
+    border-left: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .detail-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #30363d;
+    background: #1c2129;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .detail-header-icon { font-size: 24px; }
+  .detail-header-title { font-size: 15px; font-weight: 700; }
+  .detail-header-sub { font-size: 12px; color: #8b949e; margin-top: 2px; }
+  .detail-content { padding: 16px 20px; overflow-y: auto; flex: 1; }
+
+  .detail-section { margin-bottom: 16px; }
+  .detail-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #21262d;
+  }
+  .detail-section p { font-size: 13px; line-height: 1.7; color: #c9d1d9; margin-bottom: 6px; }
+
+  .code-block {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+    color: #e6edf3;
+    margin-bottom: 8px;
+  }
+
+  .kw   { color: #ff7b72; }  /* keywords */
+  .fn   { color: #d2a8ff; }  /* function names */
+  .cls  { color: #79c0ff; }  /* class names */
+  .str  { color: #a5d6ff; }  /* strings */
+  .cmt  { color: #8b949e; }  /* comments */
+  .var  { color: #ffa657; }  /* variables / fields */
+  .num  { color: #79c0ff; }  /* numbers */
+
+  .detail-pill {
+    display: inline-flex;
+    align-items: center;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 11px;
+    color: #c9d1d9;
+    margin: 2px;
+  }
+  .detail-pill.highlight { background: #0c2a4e; border-color: #1f6feb; color: #79c0ff; }
+
+  .data-flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+    flex-wrap: wrap;
+  }
+  .data-flow-item {
+    background: #21262d;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-family: 'Cascadia Code', monospace;
+    color: #e6edf3;
+  }
+  .data-flow-arrow { color: #484f58; font-size: 14px; }
+
+  .placeholder {
+    padding: 40px 20px;
+    text-align: center;
+    color: #484f58;
+  }
+  .placeholder-icon { font-size: 48px; margin-bottom: 16px; }
+  .placeholder p { font-size: 14px; line-height: 1.7; }
+
+  /* Animations */
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 #58a6ff44; }
+    50% { box-shadow: 0 0 0 4px #58a6ff22; }
+  }
+  .node.active { animation: pulse-border 2s ease-in-out infinite; }
+
+  .step-badge {
+    background: #21262d;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #8b949e;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🔄 vLLM 请求流转详细流程图</h1>
+    <p>基于 vLLM v1 源码 + PagedAttention 论文 · 点击各节点查看源码级详细说明</p>
+  </div>
+  <span class="badge">v1 架构</span>
+  <span class="badge">源码级</span>
+</header>
+
+<div class="layout">
+
+  <!-- ===== LEFT FLOW ===== -->
+  <div class="flow-area" id="flowArea">
+
+    <!-- CLIENT -->
+    <div class="node" id="n-client" onclick="showDetail('client')">
+      <div class="node-icon icon-client">👤</div>
+      <div class="node-main">
+        <div class="node-title" style="color:#e6edf3">① 客户端调用</div>
+        <div class="node-sub">LLM.generate(prompts) &nbsp;|&nbsp; OpenAI API POST /v1/completions</div>
+        <div class="node-class">vllm.LLM · openai_server.py</div>
+      </div>
+      <div class="step-badge">1</div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">prompt + SamplingParams</div></div>
+
+    <!-- FRONTEND PROCESS -->
+    <div class="process-boundary boundary-frontend">
+      <div class="process-label">🔵 Frontend Process — LLMEngine (主进程)</div>
+
+      <!-- INPUT PROCESSOR -->
+      <div class="node" id="n-input" onclick="showDetail('input')">
+        <div class="node-icon icon-input">📥</div>
+        <div class="node-main">
+          <div class="node-title" style="color:#79c0ff">② InputProcessor.process_inputs()</div>
+          <div class="node-sub">验证参数 · Tokenize · 多模态处理 · 构造 EngineCoreRequest</div>
+          <div class="node-class">vllm/v1/engine/input_processor.py</div>
+        </div>
+        <div class="step-badge">2</div>
+      </div>
+
+      <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">EngineCoreRequest (token_ids, sampling_params, arrival_time…)</div></div>
+
+      <!-- OUTPUT PROCESSOR REGISTER -->
+      <div class="node" id="n-outreg" onclick="showDetail('outreg')">
+        <div class="node-icon icon-output">📋</div>
+        <div class="node-main">
+          <div class="node-title" style="color:#79c0ff">③ OutputProcessor.add_request()</div>
+          <div class="node-sub">创建 RequestState · 初始化 IncrementalDetokenizer + LogprobsProcessor</div>
+          <div class="node-class">vllm/v1/engine/output_processor.py</div>
+        </div>
+        <div class="step-badge">3</div>
+      </div>
+    </div>
+
+    <!-- ZMQ -->
+    <div class="arrow-zmq">ZMQ IPC 跨进程通信 — EngineCoreRequest 序列化发送到 EngineCore 进程</div>
+
+    <!-- BACKEND PROCESS -->
+    <div class="process-boundary boundary-backend">
+      <div class="process-label">🟢 Backend Process — EngineCore (独立进程, ZMQ Server)</div>
+
+      <!-- SCHEDULER ADD -->
+      <div class="node" id="n-schedadd" onclick="showDetail('schedadd')">
+        <div class="node-icon icon-sched">⏳</div>
+        <div class="node-main">
+          <div class="node-title" style="color:#3fb950">④ Scheduler.add_request() → WAITING 队列</div>
+          <div class="node-sub">创建 Request 对象 · 加入等待队列 · 设置到达时间戳</div>
+          <div class="node-class">vllm/v1/core/scheduler.py · EngineCore</div>
+        </div>
+        <div class="step-badge">4</div>
+      </div>
+
+      <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">调度循环 step()</div></div>
+
+      <!-- SCHEDULER SCHEDULE -->
+      <div class="node" id="n-sched" onclick="showDetail('sched')">
+        <div class="node-icon icon-sched">🗓️</div>
+        <div class="node-main">
+          <div class="node-title" style="color:#3fb950">⑤ Scheduler._schedule() — 核心调度逻辑</div>
+          <div class="node-sub">WAITING → RUNNING · APC 前缀哈希匹配 · BlockManager 分配 KV 块</div>
+          <div class="node-class">vllm/v1/core/scheduler.py</div>
+        </div>
+        <div class="step-badge">5</div>
+      </div>
+
+      <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">SchedulerOutput (seq_groups + block_tables + num_scheduled_tokens)</div></div>
+
+      <!-- GPU PROCESS BOUNDARY -->
+      <div class="process-boundary boundary-gpu" style="margin-top:8px">
+        <div class="process-label">🟡 GPU Worker — PagedAttention 模型执行</div>
+
+        <!-- MODEL EXECUTOR -->
+        <div class="node" id="n-exec" onclick="showDetail('exec')">
+          <div class="node-icon icon-gpu">🎮</div>
+          <div class="node-main">
+            <div class="node-title" style="color:#d29922">⑥ ModelExecutor.execute_model()</div>
+            <div class="node-sub">准备输入张量 · 构建 Block Table · 触发 GPU 模型执行</div>
+            <div class="node-class">vllm/v1/worker/gpu_worker.py · ModelExecutor</div>
+          </div>
+          <div class="step-badge">6</div>
+        </div>
+
+        <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">input_ids, position_ids, block_tables → GPU</div></div>
+
+        <!-- PAGED ATTENTION -->
+        <div class="node" id="n-attn" onclick="showDetail('attn')">
+          <div class="node-icon icon-attn">🧠</div>
+          <div class="node-main">
+            <div class="node-title" style="color:#d29922">⑦ PagedAttention Forward Pass</div>
+            <div class="node-sub">读写非连续 KV 块 · Block Table 逻辑→物理映射 · Flash Attention · CUDA Graph</div>
+            <div class="node-class">vllm/attention/backends/flash_attn.py · CUDA Kernel</div>
+          </div>
+          <div class="step-badge">7</div>
+        </div>
+
+        <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">logits [batch, vocab_size]</div></div>
+
+        <!-- SAMPLER -->
+        <div class="node" id="n-sample" onclick="showDetail('sample')">
+          <div class="node-icon icon-sample">🎲</div>
+          <div class="node-main">
+            <div class="node-title" style="color:#d29922">⑧ Sampler — 采样下一个 Token</div>
+            <div class="node-sub">temperature · top-p · top-k · 贪心 / 随机采样 → next_token_id</div>
+            <div class="node-class">vllm/v1/sample/sampler.py</div>
+          </div>
+          <div class="step-badge">8</div>
+        </div>
+      </div>
+
+      <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">EngineCoreOutput (request_id, new_token_ids, finish_reason)</div></div>
+
+      <!-- STOP CHECK -->
+      <div class="node" id="n-stop" onclick="showDetail('stop')">
+        <div class="node-icon icon-sched">🛑</div>
+        <div class="node-main">
+          <div class="node-title" style="color:#3fb950">⑨ 终止条件检查</div>
+          <div class="node-sub">EOS Token · max_tokens 达上限 · Stop String · 抢占 (Preemption)</div>
+          <div class="node-class">Scheduler · EngineCore</div>
+        </div>
+        <div class="step-badge">9</div>
+      </div>
+    </div>
+
+    <!-- DECODE LOOP -->
+    <div class="loop-indicator">
+      <span class="loop-icon">🔁</span>
+      <div>
+        <div style="font-weight:700;margin-bottom:2px">Decode 循环 — 每个 Token 重复步骤 ⑤→⑨</div>
+        <div style="font-size:11px;color:#9a7fd4">Continuous Batching：每轮动态加入新请求，无需等整批完成</div>
+      </div>
+    </div>
+
+    <!-- ZMQ RETURN -->
+    <div class="arrow-zmq">ZMQ IPC 返回 — EngineCoreOutput 序列化回传到 Frontend</div>
+
+    <!-- FRONTEND OUTPUT -->
+    <div class="process-boundary boundary-frontend">
+      <div class="process-label">🔵 Frontend Process — 输出处理</div>
+
+      <div class="node" id="n-outproc" onclick="showDetail('outproc')">
+        <div class="node-icon icon-output">📤</div>
+        <div class="node-main">
+          <div class="node-title" style="color:#79c0ff">⑩ OutputProcessor.process_outputs()</div>
+          <div class="node-sub">IncrementalDetokenizer 增量解码 · LogprobsProcessor · make_request_output()</div>
+          <div class="node-class">vllm/v1/engine/output_processor.py</div>
+        </div>
+        <div class="step-badge">10</div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-label">RequestOutput (text, token_ids, finish_reason, metrics)</div></div>
+
+    <!-- CLIENT RECEIVE -->
+    <div class="node" id="n-result" onclick="showDetail('result')">
+      <div class="node-icon icon-client">✅</div>
+      <div class="node-main">
+        <div class="node-title" style="color:#e6edf3">⑪ 客户端接收结果</div>
+        <div class="node-sub">Streaming: 每 token 回调 &nbsp;|&nbsp; Non-streaming: 最终 RequestOutput</div>
+        <div class="node-class">RequestOutputCollector · asyncio Queue</div>
+      </div>
+      <div class="step-badge">11</div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+
+  <!-- ===== RIGHT DETAIL PANEL ===== -->
+  <div class="detail-panel">
+    <div id="detail-header" class="detail-header" style="display:none">
+      <div class="detail-header-icon" id="dh-icon"></div>
+      <div>
+        <div class="detail-header-title" id="dh-title"></div>
+        <div class="detail-header-sub" id="dh-sub"></div>
+      </div>
+    </div>
+    <div class="detail-content" id="detail-content">
+      <div class="placeholder">
+        <div class="placeholder-icon">👆</div>
+        <p>点击左侧流程图中的任意节点<br>查看源码级详细说明、数据结构和关键逻辑</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DETAILS = {
+
+  client: {
+    icon: '👤', title: '① 客户端调用', sub: 'LLM.generate() / OpenAI API',
+    sections: [
+      {
+        title: '两种调用方式',
+        content: `<div class="data-flow">
+          <div class="detail-pill highlight">离线 LLM.generate()</div>
+          <div class="data-flow-arrow">|</div>
+          <div class="detail-pill highlight">在线 OpenAI API</div>
+        </div>
+        <p style="margin-top:8px">离线模式直接调用 Python 对象；在线模式通过 HTTP POST 到 FastAPI Server，最终都汇聚到 <code style="color:#79c0ff">LLMEngine.add_request()</code>。</p>`,
+        code: null
+      },
+      {
+        title: '关键数据结构：SamplingParams',
+        content: '<p>客户端传入的采样参数最终变成 <code style="color:#79c0ff">SamplingParams</code> 对象随请求一路传递：</p>',
+        code: `<span class="cls">SamplingParams</span>(
+    temperature=<span class="num">0.8</span>,      <span class="cmt"># 温度 → logits 缩放</span>
+    top_p=<span class="num">0.95</span>,           <span class="cmt"># nucleus sampling</span>
+    top_k=<span class="num">50</span>,             <span class="cmt"># top-k 过滤</span>
+    max_tokens=<span class="num">512</span>,        <span class="cmt"># 最大生成长度</span>
+    stop=[<span class="str">"\\n"</span>, <span class="str">"User:"</span>], <span class="cmt"># 停止字符串</span>
+    stream=<span class="kw">True</span>,           <span class="cmt"># 是否流式输出</span>
+    seed=<span class="num">42</span>,              <span class="cmt"># 随机种子</span>
+)`
+      },
+      {
+        title: '请求生命周期时间轴',
+        content: `<div class="data-flow" style="flex-direction:column;gap:4px;align-items:flex-start">
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#d29922">T0</span> <div class="detail-pill">arrival_time 记录</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#d29922">T1</span> <div class="detail-pill">进入 WAITING 队列</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#d29922">T2</span> <div class="detail-pill">首次调度 → TTFT</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#d29922">T3…Tn</span> <div class="detail-pill">每 decode step → ITL</div></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#d29922">Tn</span> <div class="detail-pill">EOS / max_tokens → 结束</div></div>
+        </div>`
+      }
+    ]
+  },
+
+  input: {
+    icon: '📥', title: '② InputProcessor.process_inputs()', sub: 'vllm/v1/engine/input_processor.py',
+    sections: [
+      {
+        title: '核心职责',
+        content: '<p>InputProcessor 是请求进入 EngineCore 之前的唯一入口，负责所有前置处理：</p>',
+        code: `<span class="kw">def</span> <span class="fn">process_inputs</span>(self, request_id, prompt,
+                     params, ...) -> <span class="cls">EngineCoreRequest</span>:
+
+    <span class="cmt"># 1. 验证采样/汇聚参数</span>
+    self.<span class="fn">_validate_params</span>(params, supported_tasks)
+    self.<span class="fn">_validate_lora</span>(lora_request)
+
+    <span class="cmt"># 2. Tokenize（如传入字符串）</span>
+    processed = self.input_preprocessor.<span class="fn">preprocess</span>(prompt)
+
+    <span class="cmt"># 3. 验证 prompt 长度 ≤ max_model_len</span>
+    self.<span class="fn">_validate_model_inputs</span>(encoder, decoder)
+
+    <span class="cmt"># 4. Clone SamplingParams，推断 max_tokens</span>
+    sampling_params = params.<span class="fn">clone</span>()
+    <span class="kw">if</span> sampling_params.max_tokens <span class="kw">is</span> <span class="kw">None</span>:
+        sampling_params.max_tokens = max_model_len - seq_len
+
+    <span class="cmt"># 5. 构造并返回 EngineCoreRequest</span>
+    <span class="kw">return</span> <span class="cls">EngineCoreRequest</span>(
+        request_id=request_id,
+        prompt_token_ids=prompt_token_ids,
+        sampling_params=sampling_params,
+        arrival_time=arrival_time,
+        ...
+    )`
+      },
+      {
+        title: 'EngineCoreRequest 数据结构',
+        content: '<p>这是跨进程传输的核心数据包，用 <code style="color:#79c0ff">msgspec</code> 高效序列化：</p>',
+        code: `<span class="cls">EngineCoreRequest</span>:
+    request_id: <span class="cls">str</span>         <span class="cmt"># 内部唯一ID (外部ID + 8位随机)</span>
+    external_req_id: <span class="cls">str</span>  <span class="cmt"># 用户传入的原始ID</span>
+    prompt_token_ids: <span class="cls">list</span>[<span class="cls">int</span>]  <span class="cmt"># Tokenize 后的 ID 序列</span>
+    sampling_params: <span class="cls">SamplingParams</span>
+    arrival_time: <span class="cls">float</span>    <span class="cmt"># time.time() 时间戳</span>
+    mm_features: <span class="cls">list</span>[...]  <span class="cmt"># 多模态特征（图像等）</span>
+    lora_request: <span class="cls">LoRARequest</span> | <span class="kw">None</span>
+    cache_salt: <span class="cls">str</span> | <span class="kw">None</span> <span class="cmt"># APC 缓存隔离盐</span>
+    priority: <span class="cls">int</span>           <span class="cmt"># 调度优先级</span>`
+      },
+      {
+        title: '为什么分配随机后缀 ID？',
+        content: '<p>同一个 <code style="color:#79c0ff">external_req_id</code> 可能被重复提交（Parallel Sampling n>1 时拆出多个子请求），内部加随机 8 字符防止 ID 冲突：</p>',
+        code: `<span class="cmt"># assign_request_id()</span>
+request.external_req_id = request.request_id
+request.request_id = f<span class="str">"{external_id}-{random_uuid():.8}"</span>`
+      }
+    ]
+  },
+
+  outreg: {
+    icon: '📋', title: '③ OutputProcessor.add_request()', sub: 'vllm/v1/engine/output_processor.py',
+    sections: [
+      {
+        title: '预注册机制',
+        content: '<p>在请求发到 EngineCore 之前，前端就已经在 OutputProcessor 中注册好状态，确保 token 回来时能即刻处理，无需再次初始化：</p>',
+        code: `<span class="kw">def</span> <span class="fn">add_request</span>(self, request, prompt, queue=<span class="kw">None</span>):
+    req_state = <span class="cls">RequestState</span>.from_new_request(
+        tokenizer=self.tokenizer,
+        request=request,
+        prompt=prompt,
+        queue=queue,   <span class="cmt"># AsyncLLM: asyncio Queue</span>
+        ...
+    )
+    self.request_states[request_id] = req_state`
+      },
+      {
+        title: 'RequestState 追踪完整生命周期',
+        content: '<p>每个请求对应一个 RequestState，持有所有动态状态：</p>',
+        code: `<span class="cls">RequestState</span>:
+    detokenizer: <span class="cls">IncrementalDetokenizer</span>
+        <span class="cmt"># 增量解码：维护已输出 token 列表</span>
+        <span class="cmt"># 处理多字节 Unicode 边界</span>
+    logprobs_processor: <span class="cls">LogprobsProcessor</span>
+        <span class="cmt"># 累积 logprobs（如需要）</span>
+    stats: <span class="cls">RequestStateStats</span>
+        arrival_time, scheduled_ts,
+        first_token_ts, last_token_ts
+        <span class="cmt"># → 用于计算 TTFT, ITL, E2E</span>
+    is_prefilling: <span class="cls">bool</span>  <span class="cmt"># prefill/decode 阶段标志</span>
+    num_cached_tokens: <span class="cls">int</span>  <span class="cmt"># APC 命中的 token 数</span>
+    queue: <span class="cls">RequestOutputCollector</span>  <span class="cmt"># 异步输出队列</span>`
+      }
+    ]
+  },
+
+  schedadd: {
+    icon: '⏳', title: '④ Scheduler.add_request()', sub: 'vllm/v1/core/scheduler.py',
+    sections: [
+      {
+        title: '跨进程通信：ZMQ + msgspec',
+        content: '<p>EngineCore 运行在独立进程中，通过 ZMQ PUSH/PULL 接收 EngineCoreRequest，msgspec 做高性能序列化（比 pickle 快 10x）：</p>',
+        code: `<span class="cmt"># EngineCore.__init__() 中</span>
+self.ctx = zmq.<span class="fn">Context</span>()
+self.input_socket = self.ctx.<span class="fn">socket</span>(zmq.PULL)
+self.output_socket = self.ctx.<span class="fn">socket</span>(zmq.PUSH)
+
+<span class="cmt"># 接收请求循环</span>
+<span class="kw">while</span> <span class="kw">True</span>:
+    msg = self.input_socket.<span class="fn">recv</span>()
+    req = msgspec.<span class="fn">decode</span>(msg, <span class="cls">EngineCoreRequest</span>)
+    self.scheduler.<span class="fn">add_request</span>(req)`
+      },
+      {
+        title: 'WAITING 队列',
+        content: '<p>新请求进入 <code style="color:#79c0ff">self.waiting</code> 双端队列，等待下一轮 <code style="color:#79c0ff">_schedule()</code> 调用：</p>',
+        code: `<span class="cmt"># Scheduler 数据结构</span>
+self.waiting: <span class="cls">deque</span>[<span class="cls">Request</span>] = <span class="cls">deque</span>()
+self.running: <span class="cls">list</span>[<span class="cls">Request</span>] = []
+self.kv_cache_manager: <span class="cls">KVCacheManager</span>
+
+<span class="cmt"># add_request()</span>
+request = <span class="cls">Request</span>.<span class="fn">from_engine_core_request</span>(req)
+self.waiting.<span class="fn">append</span>(request)`
+      }
+    ]
+  },
+
+  sched: {
+    icon: '🗓️', title: '⑤ Scheduler._schedule() — 核心调度', sub: 'vllm/v1/core/scheduler.py',
+    sections: [
+      {
+        title: '调度三步走',
+        content: '<p>每个 step() 调用 _schedule()，依次处理：<strong>Running 队列续跑 → WAITING 队列升级 → 抢占处理</strong></p>',
+        code: `<span class="kw">def</span> <span class="fn">_schedule</span>(self) -> <span class="cls">SchedulerOutput</span>:
+
+    <span class="cmt"># Step 1: 处理当前 RUNNING 中的请求</span>
+    <span class="kw">for</span> req <span class="kw">in</span> self.running:
+        <span class="cmt"># 尝试分配下一步所需 KV 块</span>
+        ok = self.kv_cache_manager.<span class="fn">append_slots</span>(req)
+        <span class="kw">if not</span> ok:
+            <span class="cmt"># 内存不足 → 抢占（recompute / swap）</span>
+            self.<span class="fn">_preempt</span>(req)
+
+    <span class="cmt"># Step 2: 从 WAITING 队列提升请求</span>
+    <span class="kw">while</span> self.waiting:
+        req = self.waiting[<span class="num">0</span>]
+        <span class="cmt"># APC：检查前缀哈希命中</span>
+        num_cached = self.kv_cache_manager.<span class="fn">get_num_cached_tokens</span>(req)
+        <span class="cmt"># 分配新 KV 块</span>
+        ok = self.kv_cache_manager.<span class="fn">allocate</span>(req)
+        <span class="kw">if</span> ok:
+            self.waiting.<span class="fn">popleft</span>()
+            self.running.<span class="fn">append</span>(req)
+
+    <span class="kw">return</span> <span class="cls">SchedulerOutput</span>(scheduled_new_reqs=...,
+                             scheduled_running_reqs=...,
+                             num_scheduled_tokens=...)`
+      },
+      {
+        title: 'APC：自动前缀缓存命中',
+        content: '<p>BlockManager 为每个 16-token KV 块计算链式哈希，若哈希命中则直接复用已有物理块，跳过 prefill：</p>',
+        code: `<span class="cmt"># KV 块链式哈希（vLLM APC）</span>
+block_hash = <span class="fn">hash_block_tokens</span>(
+    parent_block_hash,   <span class="cmt"># 前驱块哈希（链式）</span>
+    token_ids,           <span class="cmt"># 本块 16 个 token</span>
+    extra_keys,          <span class="cmt"># LoRA ID, cache_salt 等</span>
+)
+
+<span class="cmt"># 只要 token_ids 序列相同 → hash 相同</span>
+<span class="cmt"># → 命中 → 跳过对应 prefill 计算</span>
+<span class="cmt"># 注意：粒度是 block_size=16 token</span>
+<span class="cmt"># 非对齐尾部（< 16 token）不缓存</span>`
+      },
+      {
+        title: 'SchedulerOutput 传给 GPU',
+        content: '',
+        code: `<span class="cls">SchedulerOutput</span>:
+    scheduled_new_reqs: <span class="cls">list</span>[<span class="cls">ScheduledRequest</span>]
+    scheduled_running_reqs: <span class="cls">list</span>[<span class="cls">ScheduledRequest</span>]
+    preempted_reqs: <span class="cls">list</span>[<span class="cls">Request</span>]
+    num_scheduled_tokens: <span class="cls">dict</span>[str, int]
+        <span class="cmt"># req_id → 本轮处理 token 数</span>
+        <span class="cmt"># prefill: len(prompt), decode: 1</span>
+    blocks_to_swap_in/out: ...  <span class="cmt"># CPU ↔ GPU KV 块迁移</span>
+    blocks_to_copy: ...          <span class="cmt"># CoW 写时复制（beam search）</span>`
+      }
+    ]
+  },
+
+  exec: {
+    icon: '🎮', title: '⑥ ModelExecutor.execute_model()', sub: 'vllm/v1/worker/gpu_worker.py',
+    sections: [
+      {
+        title: '接收 SchedulerOutput，准备 GPU 输入',
+        content: '<p>GPUWorker 把逻辑 Block Table 转换成 GPU 张量，交给模型做一次完整 forward pass：</p>',
+        code: `<span class="kw">def</span> <span class="fn">execute_model</span>(self,
+        scheduler_output: <span class="cls">SchedulerOutput</span>
+        ) -> <span class="cls">ModelRunnerOutput</span>:
+
+    <span class="cmt"># 1. 将 block_table 转为 GPU tensor</span>
+    block_tables = <span class="fn">prepare_block_tables</span>(
+        scheduler_output.scheduled_reqs
+    )   <span class="cmt"># shape: [num_seqs, max_blocks_per_seq]</span>
+
+    <span class="cmt"># 2. 收集各请求的 input_ids / positions</span>
+    input_ids, positions = <span class="fn">prepare_inputs</span>(
+        scheduler_output
+    )   <span class="cmt"># shape: [total_tokens_this_step]</span>
+
+    <span class="cmt"># 3. 执行 CUDA Graph (若已 warmup)</span>
+    <span class="kw">if</span> self.<span class="fn">_use_cuda_graph</span>(num_tokens):
+        output = self.graph.<span class="fn">replay</span>()
+    <span class="kw">else</span>:
+        output = self.model.<span class="fn">forward</span>(
+            input_ids, positions, block_tables
+        )`
+      },
+      {
+        title: 'CUDA Graph 加速',
+        content: '<p>在特定 batch size 下启动预捕获的 CUDA Graph，消除 Python/CUDA API 开销，decode 阶段加速 ~20%：</p>',
+        code: `<span class="cmt"># 启动时预热并捕获常见 batch size</span>
+<span class="kw">for</span> num_tokens <span class="kw">in</span> CAPTURE_SIZES:  <span class="cmt"># [1,2,4,8,16,…]</span>
+    graph = torch.cuda.<span class="cls">CUDAGraph</span>()
+    <span class="kw">with</span> torch.cuda.graph(graph):
+        out = model.<span class="fn">forward</span>(dummy_input)
+    graphs[num_tokens] = graph
+
+<span class="cmt"># Decode 时：num_tokens=1 直接 replay</span>
+<span class="cmt"># 跳过所有 Python overhead</span>`
+      }
+    ]
+  },
+
+  attn: {
+    icon: '🧠', title: '⑦ PagedAttention Forward Pass', sub: 'CUDA Kernel + Flash Attention',
+    sections: [
+      {
+        title: 'PagedAttention 核心机制（论文 §3）',
+        content: '<p>每个请求的 KV 向量存储在物理上<strong>不连续</strong>的 16-token KV 块中，Block Table 维护逻辑→物理的映射：</p>',
+        code: `<span class="cmt"># 传统方式（预分配连续内存）</span>
+KV_cache[seq_id] = Tensor(shape=[max_len, heads, dim])
+<span class="cmt"># → 平均碎片浪费 60-80% 内存</span>
+
+<span class="cmt"># PagedAttention（非连续分页）</span>
+block_table[seq_id] = [3, 7, 12, 1, ...]
+<span class="cmt"># 逻辑块 0 → 物理块 3</span>
+<span class="cmt"># 逻辑块 1 → 物理块 7  等</span>
+<span class="cmt"># 内存浪费降至 <4%（仅最后一块部分填充）</span>
+
+<span class="cmt"># CUDA Kernel 读取 KV 时根据 block_table</span>
+<span class="cmt"># 用 gather 操作拼接非连续内存块</span>`
+      },
+      {
+        title: 'KV Cache 写入（Prefill 阶段）',
+        content: '<p>Prefill 时所有 prompt token 一次性并行计算，KV 向量写入已分配的物理块：</p>',
+        code: `<span class="cmt"># Prefill: [seq_len] tokens 并行处理</span>
+K = W_k @ X   <span class="cmt"># [seq_len, heads, head_dim]</span>
+V = W_v @ X   <span class="cmt"># [seq_len, heads, head_dim]</span>
+
+<span class="cmt"># 按 block_size=16 分块写入 KV Cache</span>
+<span class="kw">for</span> i <span class="kw">in</span> range(<span class="fn">num_blocks</span>(seq_len)):
+    phys_block = block_table[i]
+    kv_cache[phys_block] = K[i*<span class="num">16</span>:(i+<span class="num">1</span>)*<span class="num">16</span>], V[...]
+
+<span class="cmt"># APC：若某块已缓存（hash命中），直接跳过</span>`
+      },
+      {
+        title: 'KV Cache 读取（Decode 阶段）',
+        content: '<p>Decode 时每次只处理 1 个 token，但需要注意历史所有 KV（跨非连续块）：</p>',
+        code: `<span class="cmt"># Decode: 1 new token per step</span>
+q = W_q @ x_new   <span class="cmt"># [1, heads, head_dim]</span>
+
+<span class="cmt"># 跨所有历史块做 attention</span>
+attn_scores = []
+<span class="kw">for</span> phys_block <span class="kw">in</span> block_table:
+    k_block = kv_cache[phys_block].K  <span class="cmt"># [16, heads, dim]</span>
+    attn_scores.<span class="fn">append</span>(q @ k_block.T)
+
+attn_out = softmax(concat(attn_scores)) @ V_all`
+      }
+    ]
+  },
+
+  sample: {
+    icon: '🎲', title: '⑧ Sampler — 采样下一个 Token', sub: 'vllm/v1/sample/sampler.py',
+    sections: [
+      {
+        title: '采样流水线',
+        content: '<p>从 logits 到最终 token ID 经过一系列变换：</p>',
+        code: `logits: <span class="cls">Tensor</span>[batch, vocab_size]
+
+<span class="cmt"># 1. Temperature 缩放</span>
+logits = logits / temperature  <span class="cmt"># temperature=0 → 贪心</span>
+
+<span class="cmt"># 2. Top-k 过滤（保留概率最高的 k 个）</span>
+logits[not_top_k] = -inf
+
+<span class="cmt"># 3. Top-p (Nucleus) 过滤</span>
+sorted_probs = softmax(logits).<span class="fn">sort</span>(desc)
+cumsum = sorted_probs.<span class="fn">cumsum</span>()
+logits[cumsum > top_p] = -inf  <span class="cmt"># 截尾</span>
+
+<span class="cmt"># 4. 采样</span>
+next_token = <span class="cls">Categorical</span>(logits=logits).<span class="fn">sample</span>()
+
+<span class="cmt"># 5. 写入新 KV 块（下一步 decode 用）</span>`
+      },
+      {
+        title: '返回值',
+        content: '',
+        code: `<span class="cls">SamplerOutput</span>:
+    outputs: <span class="cls">list</span>[<span class="cls">SequenceGroupOutput</span>]
+        sampled_token_ids: <span class="cls">list</span>[int]
+        logprobs: <span class="cls">dict</span>[int, float] | <span class="kw">None</span>
+    <span class="cmt"># 每个请求一个 SequenceGroupOutput</span>
+    <span class="cmt"># 对应 SchedulerOutput 中的 seq_groups</span>`
+      }
+    ]
+  },
+
+  stop: {
+    icon: '🛑', title: '⑨ 终止条件检查', sub: 'Scheduler + EngineCore',
+    sections: [
+      {
+        title: '四种终止原因',
+        content: '',
+        code: `<span class="kw">class</span> <span class="cls">FinishReason</span>(<span class="cls">str</span>, <span class="cls">Enum</span>):
+    STOP   = <span class="str">"stop"</span>    <span class="cmt"># EOS token 或 stop string</span>
+    LENGTH = <span class="str">"length"</span>  <span class="cmt"># max_tokens 达上限</span>
+    ABORT  = <span class="str">"abort"</span>   <span class="cmt"># 客户端取消 / 错误</span>
+    <span class="cmt"># (preempted: 临时移出 RUNNING 等重跑)</span>`
+      },
+      {
+        title: '抢占（Preemption）机制',
+        content: '<p>当 GPU 内存不足以为所有 RUNNING 请求分配下一步 KV 块时，调度器会抢占优先级最低的请求：</p>',
+        code: `<span class="cmt"># 两种抢占策略</span>
+
+<span class="cmt"># 1. Recompute（重新计算）</span>
+<span class="cmt">#    释放该请求的所有 KV 块</span>
+<span class="cmt">#    请求重回 WAITING 队列</span>
+<span class="cmt">#    重新调度时从头 prefill</span>
+<span class="cmt">#    优点：无需额外内存；缺点：浪费计算</span>
+
+<span class="cmt"># 2. Swap（换出）</span>
+<span class="cmt">#    将 GPU KV 块迁移到 CPU 内存</span>
+<span class="cmt">#    请求标记为 SWAPPED</span>
+<span class="cmt">#    内存释放后 swap-in 回 GPU</span>
+<span class="cmt">#    优点：不重算；缺点：PCIe 带宽开销</span>`
+      },
+      {
+        title: 'Continuous Batching 的关键',
+        content: '<p>终止条件触发后，该请求的 KV 块立刻被释放，调度器可在<strong>同一 step</strong> 内从 WAITING 队列提升新请求填充空位，GPU 利用率始终接近满载：</p>',
+        code: `<span class="cmt"># 一个 step 内可能同时发生：</span>
+<span class="cmt">#   req_A: 第 47 个 decode token</span>
+<span class="cmt">#   req_B: 刚完成，释放 KV 块</span>
+<span class="cmt">#   req_C: 从 WAITING 升级进来做 prefill</span>
+<span class="cmt"># → 三者在同一个 forward pass 中并行处理</span>
+<span class="cmt"># → 无需等整批完成再切换（vs 旧 static batching）</span>`
+      }
+    ]
+  },
+
+  outproc: {
+    icon: '📤', title: '⑩ OutputProcessor.process_outputs()', sub: 'vllm/v1/engine/output_processor.py',
+    sections: [
+      {
+        title: '主处理循环（最核心的 Python 循环）',
+        content: '<p>源码注释明确指出：vLLM V1 设计目标是<strong>最小化对完整 batch 的 Python 循环次数</strong>，所有 token 处理都在这个函数的一次循环内完成：</p>',
+        code: `<span class="kw">def</span> <span class="fn">process_outputs</span>(self,
+        engine_core_outputs: <span class="cls">list</span>[<span class="cls">EngineCoreOutput</span>]):
+
+    <span class="kw">for</span> output <span class="kw">in</span> engine_core_outputs:
+        req_state = self.request_states[output.request_id]
+
+        <span class="cmt"># 1. 统计 TTFT / ITL 指标</span>
+        self.<span class="fn">_update_stats_from_output</span>(req_state, output)
+
+        <span class="cmt"># 2. 增量 Detokenize</span>
+        stop_str = req_state.detokenizer.<span class="fn">update</span>(
+            output.new_token_ids,
+            finish_reason == FinishReason.STOP
+        )
+
+        <span class="cmt"># 3. 计算 logprobs（如有需要）</span>
+        req_state.logprobs_processor.<span class="fn">update_from_output</span>(output)
+
+        <span class="cmt"># 4. 构建并发送 RequestOutput</span>
+        result = req_state.<span class="fn">make_request_output</span>(
+            new_token_ids, pooling_output,
+            finish_reason, stop_reason
+        )
+        <span class="kw">if</span> req_state.queue:
+            req_state.queue.<span class="fn">put</span>(result)  <span class="cmt"># Async</span>
+        <span class="kw">else</span>:
+            request_outputs.<span class="fn">append</span>(result)  <span class="cmt"># Sync</span>`
+      },
+      {
+        title: 'IncrementalDetokenizer 增量解码',
+        content: '<p>每次只解码新增的 token，避免对全序列重复 decode，同时处理多字节 Unicode 字符边界（如中文可能跨 2-3 个 token）：</p>',
+        code: `<span class="cmt"># 维护 sliding window，识别有效 Unicode 边界</span>
+<span class="cmt"># decode 时只转换自上次发送后的新 token</span>
+new_text = tokenizer.<span class="fn">decode</span>(
+    new_token_ids,
+    skip_special_tokens=<span class="kw">True</span>,
+)
+<span class="cmt"># 若末尾是未完整的多字节字符 → 暂缓发送</span>
+<span class="cmt"># 等下一个 token 补全后再一起输出</span>`
+      }
+    ]
+  },
+
+  result: {
+    icon: '✅', title: '⑪ 客户端接收最终结果', sub: 'RequestOutput',
+    sections: [
+      {
+        title: 'RequestOutput 最终结构',
+        content: '<p>这是客户端最终拿到的对象，包含完整的生成结果和性能指标：</p>',
+        code: `<span class="cls">RequestOutput</span>:
+    request_id: <span class="cls">str</span>
+    prompt: <span class="cls">str</span>
+    prompt_token_ids: <span class="cls">list</span>[int]
+    outputs: <span class="cls">list</span>[<span class="cls">CompletionOutput</span>]
+        <span class="cmt"># 每个 CompletionOutput:</span>
+        index: <span class="cls">int</span>          <span class="cmt"># n=1时 index=0</span>
+        text: <span class="cls">str</span>           <span class="cmt"># 生成的文本</span>
+        token_ids: <span class="cls">list</span>[int]
+        finish_reason: <span class="cls">str</span>  <span class="cmt"># "stop"/"length"</span>
+        logprobs: ...         <span class="cmt"># 若请求了</span>
+    finished: <span class="cls">bool</span>
+    num_cached_tokens: <span class="cls">int</span>  <span class="cmt"># APC 命中数</span>
+    metrics: <span class="cls">RequestStateStats</span>
+        time_to_first_token: <span class="cls">float</span>  <span class="cmt"># TTFT (s)</span>
+        time_per_output_token: <span class="cls">float</span> <span class="cmt"># ITL (s)</span>
+        e2e_latency: <span class="cls">float</span>          <span class="cmt"># 总延迟 (s)</span>`
+      },
+      {
+        title: '流式 vs 非流式',
+        content: '',
+        code: `<span class="cmt"># 非流式（LLMEngine 同步）</span>
+outputs = llm.<span class="fn">generate</span>(prompts)
+<span class="kw">for</span> output <span class="kw">in</span> outputs:
+    print(output.outputs[<span class="num">0</span>].text)
+
+<span class="cmt"># 流式（AsyncLLM / OpenAI API）</span>
+<span class="kw">async for</span> chunk <span class="kw">in</span> engine.<span class="fn">generate</span>(...):
+    <span class="cmt"># 每个新 token 到来即推送 SSE chunk</span>
+    yield chunk  <span class="cmt"># → delta.content = 新增文本</span>`
+      }
+    ]
+  }
+};
+
+function showDetail(key) {
+  // Remove active from all nodes
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+  // Activate clicked node
+  const nodeEl = document.getElementById('n-' + key);
+  if (nodeEl) nodeEl.classList.add('active');
+
+  const d = DETAILS[key];
+  if (!d) return;
+
+  // Update header
+  document.getElementById('detail-header').style.display = 'flex';
+  document.getElementById('dh-icon').textContent = d.icon;
+  document.getElementById('dh-title').textContent = d.title;
+  document.getElementById('dh-sub').textContent = d.sub;
+
+  // Build content
+  let html = '';
+  for (const s of d.sections) {
+    html += `<div class="detail-section">`;
+    if (s.title) html += `<div class="detail-section-title">${s.title}</div>`;
+    if (s.content) html += s.content;
+    if (s.code) html += `<div class="code-block">${s.code}</div>`;
+    html += `</div>`;
+  }
+  document.getElementById('detail-content').innerHTML = html;
+}
+
+// Auto-show client detail on load
+window.onload = () => showDetail('client');
+</script>
+</body>
+</html>
