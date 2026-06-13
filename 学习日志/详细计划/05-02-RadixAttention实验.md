@@ -79,5 +79,8 @@ if __name__ == "__main__":
 数据 + 一句话结论写进日志："RadixAttention 的本质优势不是更快的 kernel，而是更细的缓存粒度。"
 
 ## 今日产出
-- [ ] 06_radix_attention.py + 三档前缀数据表
-- [ ] 半块前缀对照表（vs vLLM）
+- [x] 07_radix_attention.py（06 已被 vLLM prefix caching 占用，改用 07）+ 三档前缀数据表
+- [x] 半块前缀对照表（SGLang 94.9% vs vLLM 82.1%，多命中 15 token）
+
+> 完成于 2026-06-13。完整笔记：[[RadixAttention多轮对话实验-06-13]]
+> 核心数据：多轮对话轮2起每轮只 prefill 16-19 新 token；半块对照 SGLang 多救回 15 token（一个 block_size 的损失）。
