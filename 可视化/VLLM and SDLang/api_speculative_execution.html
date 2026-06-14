@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; background: var(--bg-primary, #0f1117); color: #e8eaf6; padding: 16px; font-size: 14px; }
+h2 { color: #7c9ef8; font-size: 16px; margin-bottom: 4px; }
+.subtitle { color: #9aa3b8; font-size: 12px; margin-bottom: 16px; }
+.layout { display: flex; gap: 14px; flex-wrap: wrap; }
+.panel { background: #1a1d2e; border-radius: 10px; padding: 14px; }
+.panel-title { font-size: 12px; font-weight: 700; color: #7c9ef8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.btn { background: #2d3561; border: none; border-radius: 6px; color: #c8d0f8; padding: 8px 14px; cursor: pointer; font-size: 13px; margin: 3px; transition: background 0.2s; }
+.btn:hover { background: #3d4a80; }
+.btn.primary { background: #3d5ab0; }
+.timeline { display: flex; flex-direction: column; gap: 8px; }
+.api-call { border-radius: 8px; padding: 10px 12px; font-size: 12px; border: 1.5px solid; }
+.api-naive { background: #2a1010; border-color: #5a2020; }
+.api-spec { background: #0f2518; border-color: #1a5030; }
+.api-spec-2 { background: #1a1030; border-color: #3040a0; }
+.call-header { font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.badge { display: inline-block; border-radius: 4px; padding: 1px 7px; font-size: 10px; font-weight: 700; }
+.badge-red { background: #5a2020; color: #f09090; }
+.badge-green { background: #1a4020; color: #70d090; }
+.badge-blue { background: #1a2060; color: #90a0f0; }
+.payload { font-family: monospace; font-size: 11px; color: #8090b0; margin-top: 4px; line-height: 1.6; }
+.highlight-input { color: #7c9ef8; }
+.highlight-output { color: #4caf7d; }
+.highlight-extra { color: #ffd060; }
+.arrow-down { text-align: center; font-size: 18px; color: #3a4060; margin: 2px 0; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.stat { background: #12152a; border-radius: 7px; padding: 10px; text-align: center; }
+.stat-num { font-size: 24px; font-weight: 700; }
+.stat-label { font-size: 10px; color: #6070a0; margin-top: 2px; }
+.info-box { background: #12152a; border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.7; color: #b8c0d8; }
+.tab-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.tab { padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; background: #1e2340; color: #6070a0; border: 1.5px solid #2a3060; }
+.tab.active { background: #2d3561; color: #c8d0f8; border-color: #4c5fb0; }
+.section { display: none; }
+.section.active { display: block; }
+</style>
+</head>
+<body>
+<h2>🔮 API Speculative Execution 演示</h2>
+<p class="subtitle">从 Wikipedia 提取 name、job、age 三个字段——对比朴素方案 vs 推测执行</p>
+
+<div class="tab-row">
+  <div class="tab active" onclick="switchTab('naive')">❌ 朴素方案（3次API调用）</div>
+  <div class="tab" onclick="switchTab('spec')">✅ 推测执行（1次+验证）</div>
+  <div class="tab" onclick="switchTab('compare')">📊 对比总结</div>
+</div>
+
+<div class="section active" id="tab-naive">
+  <div class="panel">
+    <div class="panel-title">朴素方案：3个 gen() 调用 = 3次 API 请求</div>
+    <div class="timeline">
+      <div class="api-call api-naive">
+        <div class="call-header">
+          <span class="badge badge-red">API Call 1</span> 提取 name
+        </div>
+        <div class="payload">
+          输入：<span class="highlight-input">[上下文：Wikipedia页面全文 1200 tokens] + "name:"</span><br>
+          输出：<span class="highlight-output">"埃隆·马斯克"</span><br>
+          <span style="color:#5a6080">→ 计费：1200 input tokens + 10 output tokens</span>
+        </div>
+      </div>
+      <div class="arrow-down">↓</div>
+      <div class="api-call api-naive">
+        <div class="call-header">
+          <span class="badge badge-red">API Call 2</span> 提取 job
+        </div>
+        <div class="payload">
+          输入：<span class="highlight-input">[同样的上下文 1200 tokens] + "name: 埃隆·马斯克\njob:"</span><br>
+          输出：<span class="highlight-output">"CEO"</span><br>
+          <span style="color:#5a6080">→ 计费：<strong style="color:#f07070">又一次</strong> 1200 input tokens + 8 output tokens</span>
+        </div>
+      </div>
+      <div class="arrow-down">↓</div>
+      <div class="api-call api-naive">
+        <div class="call-header">
+          <span class="badge badge-red">API Call 3</span> 提取 age
+        </div>
+        <div class="payload">
+          输入：<span class="highlight-input">[同样的上下文 1200 tokens] + "name: 埃隆·马斯克\njob: CEO\nage:"</span><br>
+          输出：<span class="highlight-output">"52"</span><br>
+          <span style="color:#5a6080">→ 计费：<strong style="color:#f07070">第三次</strong> 1200 input tokens + 5 output tokens</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-num" style="color:#f07070">3次</div><div class="stat-label">API 请求</div></div>
+      <div class="stat"><div class="stat-num" style="color:#f07070">3600</div><div class="stat-label">input token 计费</div></div>
+      <div class="stat"><div class="stat-num" style="color:#f07070">3×RTT</div><div class="stat-label">网络往返延迟</div></div>
+      <div class="stat"><div class="stat-num" style="color:#f07070">高</div><div class="stat-label">总费用</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="tab-spec">
+  <div class="panel">
+    <div class="panel-title">推测执行：1次"超额生成" + 就地复用</div>
+    <div class="info-box" style="margin-bottom:10px">
+      <strong style="color:#c8d0f8">思路：</strong>第一次调用时，故意<span style="color:#ffd060">忽略 stop="\\n"</span>，让模型继续生成直到所有字段都填完。然后把多余的输出保存起来，后续的 gen() 调用直接复用，不再发请求。
+    </div>
+    <div class="timeline">
+      <div class="api-call api-spec">
+        <div class="call-header">
+          <span class="badge badge-green">API Call 1</span> 提取 name（但不停止，让模型继续）
+        </div>
+        <div class="payload">
+          输入：<span class="highlight-input">[上下文 1200 tokens] + "name:"</span><br>
+          正常输出应在此停止：<span class="highlight-output">"埃隆·马斯克\n"</span><br>
+          <span style="color:#ffd060">推测执行：继续生成 → </span><span class="highlight-extra">"job: CEO\nage: 52\n"</span><br>
+          <span style="color:#5a6080">→ 计费：1200 input tokens + 23 output tokens（多了点，但便宜）</span>
+        </div>
+      </div>
+      <div class="arrow-down">↓</div>
+      <div class="api-call api-spec-2">
+        <div class="call-header">
+          <span class="badge badge-blue">本地验证</span> gen("job") 调用
+        </div>
+        <div class="payload">
+          SGLang 检查缓存的多余输出：<span class="highlight-extra">"job: CEO\n"</span><br>
+          ✓ 格式匹配！直接复用，<strong style="color:#4caf7d">不发 API 请求</strong><br>
+          <span style="color:#5a6080">→ 计费：0 input tokens</span>
+        </div>
+      </div>
+      <div class="arrow-down">↓</div>
+      <div class="api-call api-spec-2">
+        <div class="call-header">
+          <span class="badge badge-blue">本地验证</span> gen("age") 调用
+        </div>
+        <div class="payload">
+          SGLang 检查缓存的多余输出：<span class="highlight-extra">"age: 52\n"</span><br>
+          ✓ 格式匹配！直接复用，<strong style="color:#4caf7d">不发 API 请求</strong><br>
+          <span style="color:#5a6080">→ 计费：0 input tokens</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-num" style="color:#4caf7d">1次</div><div class="stat-label">API 请求</div></div>
+      <div class="stat"><div class="stat-num" style="color:#4caf7d">1200</div><div class="stat-label">input token 计费</div></div>
+      <div class="stat"><div class="stat-num" style="color:#4caf7d">1×RTT</div><div class="stat-label">网络往返延迟</div></div>
+      <div class="stat"><div class="stat-num" style="color:#4caf7d">低</div><div class="stat-label">总费用</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="tab-compare">
+  <div class="panel">
+    <div class="panel-title">三种技术横向对比</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tr style="color:#7c9ef8;border-bottom:1px solid #2a3060">
+          <th style="padding:8px;text-align:left">技术</th>
+          <th style="padding:8px;text-align:left">解决的问题</th>
+          <th style="padding:8px;text-align:left">核心机制</th>
+          <th style="padding:8px;text-align:left">效果</th>
+          <th style="padding:8px;text-align:left">适用场景</th>
+        </tr>
+        <tr style="border-bottom:1px solid #1e2340">
+          <td style="padding:8px;color:#4caf7d;font-weight:700">RadixAttention</td>
+          <td style="padding:8px;color:#b0b8d8">KV Cache 每次请求后丢弃，相同前缀重复计算</td>
+          <td style="padding:8px;color:#b0b8d8">Radix Tree 维护历史KV，prefix match → 直接复用</td>
+          <td style="padding:8px;color:#4caf7d">TTFT ↓，Throughput ↑，内存共享</td>
+          <td style="padding:8px;color:#b0b8d8">多轮对话、RAG、Few-shot、相同system prompt</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e2340">
+          <td style="padding:8px;color:#ffd060;font-weight:700">Compressed FSM</td>
+          <td style="padding:8px;color:#b0b8d8">结构化输出的JSON固定字符，每个token都做一次forward pass</td>
+          <td style="padding:8px;color:#b0b8d8">FSM 中确定性单出边路径合并，一步输出整段</td>
+          <td style="padding:8px;color:#ffd060">JSON decode 吞吐 ↑ 1.6×</td>
+          <td style="padding:8px;color:#b0b8d8">JSON mode、结构化输出、固定格式模板</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#9c7ef8;font-weight:700">API Speculative Exec</td>
+          <td style="padding:8px;color:#b0b8d8">黑盒API模型的多次gen()调用重复发送上下文</td>
+          <td style="padding:8px;color:#b0b8d8">第一次调用超额生成，后续调用本地验证复用</td>
+          <td style="padding:8px;color:#9c7ef8">input token费用降低~3×</td>
+          <td style="padding:8px;color:#b0b8d8">GPT-4等API模型的多字段提取、信息抽取</td>
+        </tr>
+      </table>
+    </div>
+    <div class="info-box" style="margin-top:12px">
+      <strong style="color:#c8d0f8">三者的共同逻辑：</strong><br>
+      都是在"提前知道某些信息"的前提下，跳过不必要的计算。<br>
+      RadixAttention → 知道"前缀相同"，跳过前缀的 prefill<br>
+      Compressed FSM → 知道"下一个token确定"，跳过那次 forward pass<br>
+      API Speculative → 知道"后续gen()会问同样的上下文"，提前多生成并本地复用
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['naive','spec','compare'][i] === name);
+  });
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; background: var(--bg-primary, #0f1117); color: var(--text-primary, #e8eaf6); padding: 16px; font-size: 14px; }
+h2 { color: #7c9ef8; font-size: 16px; margin-bottom: 4px; }
+.subtitle { color: #9aa3b8; font-size: 12px; margin-bottom: 16px; }
+.layout { display: flex; gap: 14px; flex-wrap: wrap; }
+.panel { background: #1a1d2e; border-radius: 10px; padding: 14px; }
+.panel-title { font-size: 12px; font-weight: 700; color: #7c9ef8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.btn { background: #2d3561; border: none; border-radius: 6px; color: #c8d0f8; padding: 8px 14px; cursor: pointer; font-size: 13px; margin: 3px; transition: background 0.2s; }
+.btn:hover { background: #3d4a80; }
+.btn.primary { background: #3d5ab0; color: #fff; }
+.step-box { display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0; min-height: 36px; align-items: center; }
+.token { display: inline-block; padding: 5px 10px; border-radius: 5px; font-family: monospace; font-size: 13px; font-weight: 700; }
+.token-pending { background: #1e2340; border: 1.5px solid #3a4060; color: #6a7090; }
+.token-skip { background: #1a3020; border: 1.5px solid #4caf7d; color: #4caf7d; }
+.token-active { background: #2a2050; border: 2px solid #9c7ef8; color: #c8a8ff; animation: pulse 0.8s ease-in-out infinite; }
+.token-done { background: #3d1a1a; border: 1.5px solid #f07070; color: #f07070; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+.fsm-area { display: flex; flex-direction: column; gap: 12px; }
+.fsm-row { display: flex; align-items: center; gap: 0; }
+.state { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: 2px solid; flex-shrink: 0; }
+.state-normal { background: #1e2340; border-color: #3a4060; color: #7080a0; }
+.state-active { background: #2a1550; border-color: #9c7ef8; color: #c8a8ff; }
+.state-done { background: #1a3020; border-color: #4caf7d; color: #4caf7d; }
+.state-deterministic { background: #102018; border-color: #2a5030; color: #2a5030; }
+.arrow { padding: 0 2px; color: #3a4060; font-size: 11px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.arrow span { font-family: monospace; font-size: 10px; color: #5060a0; white-space: nowrap; }
+.arrow-compressed span { color: #4caf7d; }
+.arrow-det { color: #2a5030; }
+.info-box { background: #12152a; border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.7; color: #b8c0d8; }
+.highlight { color: #4caf7d; font-weight: 700; }
+.highlight2 { color: #9c7ef8; font-weight: 700; }
+.stat-row { display: flex; gap: 16px; margin-top: 8px; }
+.stat { text-align: center; background: #12152a; border-radius: 7px; padding: 8px 14px; }
+.stat-num { font-size: 22px; font-weight: 700; }
+.stat-label { font-size: 10px; color: #6070a0; }
+.comparison { display: flex; gap: 10px; margin-top: 10px; }
+.comp-col { flex: 1; border-radius: 7px; padding: 10px; }
+.comp-bad { background: #2a1010; border: 1px solid #5a2020; }
+.comp-good { background: #0f2a18; border: 1px solid #1a5030; }
+.comp-title { font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+.forward-pass { display: inline-block; background: #3d1a60; border: 1px solid #6040a0; color: #c090f0; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: monospace; margin: 1px; }
+.forward-pass-green { background: #0f3020; border-color: #2a6040; color: #60d090; }
+</style>
+</head>
+<body>
+<h2>⚡ Compressed FSM 交互演示</h2>
+<p class="subtitle">生成 JSON 字段 <code style="background:#1e2340;padding:2px 6px;border-radius:4px">{"summary": "...</code> 时，两种方案对比</p>
+
+<div class="layout">
+  <div class="panel" style="flex:1;min-width:280px">
+    <div class="panel-title">当前生成的 JSON 输出</div>
+    <div class="step-box" id="outputTokens"></div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-num" id="forwardCount" style="color:#f07070">0</div><div class="stat-label">Forward Pass 次数</div></div>
+      <div class="stat"><div class="stat-num" id="savedCount" style="color:#4caf7d">0</div><div class="stat-label">节省 Forward Pass</div></div>
+    </div>
+    <div style="margin-top: 12px; display:flex; gap:6px">
+      <button class="btn primary" onclick="stepOld()">▶ 旧系统 下一步</button>
+      <button class="btn primary" style="background:#1a4030" onclick="stepNew()">▶▶ 新系统 下一步</button>
+      <button class="btn" onclick="resetSim()">↺</button>
+    </div>
+    <div class="info-box" style="margin-top:10px" id="simInfo">
+      点击"旧系统 下一步"或"新系统 下一步"开始模拟<br>
+      <span style="color:#6070a0">对比两种方案需要多少次 Forward Pass</span>
+    </div>
+  </div>
+  
+  <div class="panel" style="flex:1;min-width:280px">
+    <div class="panel-title">FSM 状态机（压缩前 vs 压缩后）</div>
+    <div class="fsm-area">
+      <div>
+        <div style="font-size:11px;color:#f07070;margin-bottom:6px">❌ 旧系统：普通 FSM（每步一个token）</div>
+        <div class="fsm-row" id="oldFsm"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#4caf7d;margin-bottom:6px">✅ 新系统：Compressed FSM（确定性路径合并）</div>
+        <div class="fsm-row" id="newFsm"></div>
+      </div>
+    </div>
+    <div class="info-box" style="margin-top:10px">
+      <strong style="color:#c8d0f8">核心思路：</strong><br>
+      当 FSM 某段路径上每个状态只有 <span class="highlight">唯一</span> 的合法下一token（确定性），就把这段路径压缩成一步，一次 forward pass 直接输出整段文字。<br><br>
+      <strong style="color:#c8d0f8">用打字类比：</strong><br>
+      普通：每敲一个键就问"下一个键是什么？"<br>
+      压缩：已经知道接下来要敲 <code style="color:#4caf7d">{"summary": "</code> 这11个字符，直接一次全敲完。
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px">
+  <div class="panel-title">两种方案对比</div>
+  <div class="comparison">
+    <div class="comp-col comp-bad">
+      <div class="comp-title" style="color:#f07070">旧系统：逐 token decode</div>
+      生成 <code>{"summary": "</code> (11个字符) 需要：<br>
+      <span class="forward-pass">FP1: {</span>
+      <span class="forward-pass">FP2: "</span>
+      <span class="forward-pass">FP3: sum</span>
+      <span class="forward-pass">FP4: mary</span>
+      <span class="forward-pass">FP5: "</span>
+      <span class="forward-pass">FP6: :</span>
+      <span class="forward-pass">FP7: _"</span>
+      = <strong style="color:#f07070">7次 Forward Pass</strong>
+    </div>
+    <div class="comp-col comp-good">
+      <div class="comp-title" style="color:#4caf7d">新系统：Compressed FSM</div>
+      整段固定字符串，FSM 识别为确定性路径：<br>
+      <span class="forward-pass forward-pass-green">FP1: {"summary": "</span>（整段）
+      + 模型自由生成内容 + 
+      <span class="forward-pass forward-pass-green">FP2: "}</span>（结尾）<br>
+      = <strong style="color:#4caf7d">2次 Forward Pass（节省5次）</strong>
+    </div>
+  </div>
+</div>
+
+<script>
+// 模拟 token 序列：JSON 字段
+// 分组：确定性（JSON结构）vs 自由（内容）
+const TOKEN_GROUPS = [
+  { tokens: ['{'], det: true, group: 'json-start' },
+  { tokens: ['"summary"', ':', ' "'], det: true, group: 'json-key' },
+  { tokens: ['这篇', '文章', '讲述', '了...'], det: false, group: 'content' },
+  { tokens: ['"', '}'], det: true, group: 'json-end' },
+];
+
+const ALL_TOKENS = TOKEN_GROUPS.flatMap(g => g.tokens.map(t => ({ t, det: g.det })));
+
+let oldPos = 0, newPos = 0, oldFP = 0, newFP = 0;
+let mode = null; // 'old' or 'new'
+
+function renderTokens() {
+  const container = document.getElementById('outputTokens');
+  container.innerHTML = '';
+  ALL_TOKENS.forEach((tok, i) => {
+    const span = document.createElement('span');
+    span.className = 'token';
+    const done = (mode === 'old' && i < oldPos) || (mode === 'new' && i < newPos);
+    const active = (mode === 'old' && i === oldPos) || (mode === 'new' && i === newPos);
+    if (done) span.className += tok.det ? ' token-skip' : ' token-done';
+    else if (active) span.className += ' token-active';
+    else span.className += ' token-pending';
+    span.textContent = tok.t;
+    container.appendChild(span);
+  });
+  document.getElementById('forwardCount').textContent = mode === 'old' ? oldFP : newFP;
+  // 最大可节省 = 旧系统FP - 新系统FP（旧系统确定性token个数-新系统压缩步数）
+  const maxNew = 2; // compressed: 2 det groups → 2 FP
+  const maxOld = TOKEN_GROUPS.flatMap(g => g.det ? g.tokens : []).length; // 5 det tokens
+  const saved = Math.max(0, oldFP - newFP);
+  document.getElementById('savedCount').textContent = saved;
+}
+
+// 旧系统 FSM 状态
+function drawOldFsm() {
+  const states = ['S0','{','key',':','" "','内容...','"}'];
+  const labels = ['', '{', '"sum...',  ':' , ' "', '自由内容', '"、}'];
+  let html = '';
+  states.forEach((s, i) => {
+    let cls = 'state-normal';
+    if (mode==='old' && i <= oldPos) cls = i < oldPos ? 'state-done' : 'state-active';
+    html += `<div class="state ${cls}">${s}</div>`;
+    if (i < states.length-1) {
+      const det = i < 4 || i === 5;
+      html += `<div class="arrow ${det?'':''}"><span>${labels[i+1]}</span><span>→</span></div>`;
+    }
+  });
+  document.getElementById('oldFsm').innerHTML = html;
+}
+
+// 新系统 压缩FSM
+function drawNewFsm() {
+  // 只有3个状态：START → [压缩: {"summary": "] → 自由内容 → [压缩: "}]
+  const parts = [
+    { label: 'START', type: 'state' },
+    { label: '{"summary": "', type: 'edge-compressed', desc: '确定性，压缩' },
+    { label: '内容', type: 'state-content' },
+    { label: '"}', type: 'edge-compressed', desc: '确定性' },
+    { label: 'END', type: 'state-end' },
+  ];
+  let html = '';
+  parts.forEach((p, i) => {
+    if (p.type === 'state' || p.type === 'state-content' || p.type === 'state-end') {
+      let cls = 'state-normal';
+      if (mode === 'new') {
+        if (p.type==='state' && newPos===0) cls='state-active';
+        else if (p.type==='state-content' && newPos>3 && newPos<7) cls='state-active';
+        else if (p.type==='state-end' && newPos>=7) cls='state-done';
+        else if (newPos>0) cls='state-done';
+      }
+      html += `<div class="state ${cls}" style="width:50px;height:50px;font-size:10px">${p.label}</div>`;
+    } else {
+      html += `<div class="arrow arrow-compressed" style="flex:1;padding:0 4px"><span style="color:#4caf7d;text-align:center">${p.label}</span><span style="color:#4caf7d">────→</span><span style="color:#5a7060;font-size:9px">${p.desc}</span></div>`;
+    }
+  });
+  document.getElementById('newFsm').innerHTML = html;
+}
+
+function stepOld() {
+  mode = 'old';
+  if (oldPos >= ALL_TOKENS.length) { 
+    document.getElementById('simInfo').innerHTML = '<span class="highlight2">旧系统完成！共 ' + oldFP + ' 次 Forward Pass</span>'; 
+    return; 
+  }
+  oldPos++;
+  oldFP++;
+  const tok = ALL_TOKENS[oldPos-1];
+  const info = tok.det 
+    ? `<span class="highlight">确定性token</span>："<code>${tok.t}</code>"<br>尽管只有唯一合法选项，旧系统仍执行了一次完整 Forward Pass。<br>已累计 <strong>${oldFP} 次</strong> Forward Pass`
+    : `<span style="color:#f0c060">自由生成</span>："<code>${tok.t}</code>"<br>模型从多种可能中采样，需要 Forward Pass。<br>已累计 <strong>${oldFP} 次</strong> Forward Pass`;
+  document.getElementById('simInfo').innerHTML = info;
+  renderTokens(); drawOldFsm(); drawNewFsm();
+}
+
+function stepNew() {
+  mode = 'new';
+  if (newPos >= ALL_TOKENS.length) {
+    document.getElementById('simInfo').innerHTML = '<span class="highlight">新系统完成！共 ' + newFP + ' 次 Forward Pass，节省 ' + (oldFP>0?(oldFP-newFP):5) + ' 次</span>';
+    return;
+  }
+  // 找到下一个"组"
+  let consumed = 0;
+  for (const group of TOKEN_GROUPS) {
+    if (newPos < consumed + group.tokens.length) {
+      // 在这个组里
+      if (group.det) {
+        // 跳过整组
+        const skip = group.tokens.length - (newPos - consumed);
+        newPos += skip;
+        newFP++;
+        document.getElementById('simInfo').innerHTML = 
+          `<span class="highlight">压缩路径！</span> 整段 "<code>${group.tokens.join('')}</code>" 是确定性的。<br>` +
+          `Compressed FSM 识别到这 ${group.tokens.length} 个token只有唯一选项，<br>一次 Forward Pass 直接输出 <strong style="color:#4caf7d">${group.tokens.length} 个token</strong>。<br>已累计 <strong>${newFP} 次</strong> Forward Pass`;
+      } else {
+        // 每个token一步
+        newPos++;
+        newFP++;
+        document.getElementById('simInfo').innerHTML = 
+          `<span style="color:#f0c060">自由内容</span>："<code>${ALL_TOKENS[newPos-1].t}</code>"<br>模型自由生成，需要 Forward Pass。<br>已累计 <strong>${newFP} 次</strong> Forward Pass`;
+      }
+      break;
+    }
+    consumed += group.tokens.length;
+  }
+  renderTokens(); drawOldFsm(); drawNewFsm();
+}
+
+function resetSim() {
+  oldPos = newPos = oldFP = newFP = 0; mode = null;
+  renderTokens(); drawOldFsm(); drawNewFsm();
+  document.getElementById('simInfo').innerHTML = '点击"旧系统 下一步"或"新系统 下一步"开始模拟<br><span style="color:#6070a0">对比两种方案需要多少次 Forward Pass</span>';
+}
+
+renderTokens(); drawOldFsm(); drawNewFsm();
+</script>
+</body>
+</html>

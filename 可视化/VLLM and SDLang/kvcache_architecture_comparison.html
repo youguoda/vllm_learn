@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#0d1018;color:#e0e4f0;padding:14px;font-size:13px;min-width:600px}
+h2{color:#8ab4f8;font-size:15px;margin-bottom:2px;font-weight:700}
+.sub{color:#7a8aaa;font-size:11px;margin-bottom:12px}
+
+/* tabs */
+.tab-row{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.tab{padding:5px 13px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;background:#151a28;color:#5a6888;border:1.5px solid #222a40;transition:all .2s}
+.tab:hover{border-color:#4a5888}
+.tab.on{background:#1e2840;color:#c0ccee;border-color:#4a5f9a}
+.section{display:none}.section.on{display:block}
+
+/* layout */
+.dual{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.panel{background:#131622;border-radius:9px;padding:12px;border:1px solid #1e2438}
+.vllm-panel{border-color:#2a4060}
+.sg-panel{border-color:#1a4028}
+.ptitle{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid}
+.ptitle-v{color:#6aacde;border-color:#1e3450}
+.ptitle-s{color:#5acf88;border-color:#143220}
+
+/* tokens */
+.tok-row{display:flex;gap:2px;flex-wrap:wrap;margin:6px 0}
+.tok{height:22px;padding:0 5px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:1px solid;cursor:pointer;transition:all .2s;white-space:nowrap}
+.tok:hover{filter:brightness(1.2)}
+
+/* blocks */
+.block-row{display:flex;gap:3px;flex-wrap:wrap;margin:6px 0;align-items:center}
+.block{border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1.5px solid;cursor:pointer;transition:all .25s;padding:3px 4px;min-width:46px;height:42px;text-align:center}
+.block:hover{filter:brightness(1.3);transform:translateY(-1px)}
+
+/* tree */
+.tree-node{border-radius:6px;border:1.5px solid;padding:3px 7px;font-size:10px;font-weight:700;cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;transition:all .25s;white-space:nowrap}
+.tree-node:hover{filter:brightness(1.3)}
+.tree-connector{color:#2a3450;font-size:16px;margin:0 2px}
+
+/* colors */
+.sys{background:#111d30;border-color:#3a6090;color:#6aaad8}
+.usr{background:#102218;border-color:#2a6840;color:#5ac878}
+.ans{background:#1a1030;border-color:#6040a0;color:#a070e8}
+.new{background:#1e1408;border-color:#706030;color:#c0a050}
+.hit{background:#0a1e12;border-color:#1a8050;color:#40d880;animation:pulse .5s ease}
+.miss{background:#200808;border-color:#803020;color:#e05030}
+.partial{background:#1a1808;border-color:#807030;color:#d0c050}
+.neutral{background:#141820;border-color:#2a3050;color:#5a6888}
+@keyframes pulse{0%{box-shadow:0 0 0 rgba(26,128,80,0)}50%{box-shadow:0 0 10px rgba(26,128,80,.4)}100%{box-shadow:none}}
+
+/* info & stats */
+.info{background:#0e1220;border-radius:7px;padding:9px;font-size:11px;line-height:1.75;color:#9aa8c8;margin-top:8px;border:1px solid #1a2035}
+.stats-row{display:flex;gap:6px;margin-top:8px}
+.stat{flex:1;background:#0e1220;border-radius:6px;padding:7px;text-align:center;border:1px solid #1a2035}
+.snum{font-size:18px;font-weight:700}
+.slbl{font-size:9px;color:#4a5878;margin-top:1px}
+.hl{font-weight:700}
+.hl-v{color:#6aacde}
+.hl-s{color:#5acf88}
+.hl-hit{color:#40d880}
+.hl-miss{color:#e05030}
+.hl-y{color:#d0c050}
+
+/* scenario buttons */
+.btn{background:#1a2035;border:1.5px solid #2a3455;border-radius:6px;color:#9aabcc;padding:6px 11px;cursor:pointer;font-size:11px;font-weight:600;margin:2px;transition:all .2s}
+.btn:hover{background:#222a45;border-color:#3a4a6a;color:#c0ccee}
+.btn.active{background:#1e3050;border-color:#4a70aa;color:#8ab4f8}
+.btn-run{border-color:#2a5040;color:#5acf88}
+.btn-run:hover{background:#162018;border-color:#3a7050;color:#7ae898}
+.btn-run.active{background:#0e2018;border-color:#3a8050}
+
+/* granularity demo */
+.gran-wrap{display:flex;gap:3px;align-items:flex-end;flex-wrap:wrap}
+.gran-blk{border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;border:1.5px solid;text-align:center}
+
+/* full-width table */
+.cmp-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.cmp-table th{color:#6a7a9a;padding:6px 10px;border-bottom:1px solid #1e2438;text-align:left;font-weight:700;background:#0e1220}
+.cmp-table td{padding:6px 10px;border-bottom:1px solid #141828;vertical-align:top;line-height:1.6}
+.cmp-table tr:hover td{background:#111622}
+</style>
+</head>
+
+<body>
+<h2 class="sr-only">KV Cache 架构对比：vLLM PagedAttention vs SGLang RadixAttention</h2>
+<h2>⚡ KV Cache 架构对比：vLLM vs SGLang</h2>
+<p class="sub">选择场景，观察两种架构在同一输入下的行为差异</p>
+
+<div class="tab-row">
+  <div class="tab on" onclick="sw('scene')">🎬 场景对比</div>
+  <div class="tab" onclick="sw('gran')">📏 粒度对比</div>
+  <div class="tab" onclick="sw('struct')">🏗️ 数据结构</div>
+  <div class="tab" onclick="sw('table')">📊 全维度比较</div>
+</div>
+
+<!-- SCENE TAB -->
+<div class="section on" id="tab-scene">
+  <div style="margin-bottom:8px;display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:11px;color:#5a6888">选择场景：</span>
+    <button class="btn active" id="sc0" onclick="setScene(0)">① 首次请求</button>
+    <button class="btn" id="sc1" onclick="setScene(1)">② 相同系统提示</button>
+    <button class="btn" id="sc2" onclick="setScene(2)">③ 18-token前缀（非整块）</button>
+    <button class="btn" id="sc3" onclick="setScene(3)">④ 多轮对话第3轮</button>
+  </div>
+
+  <div class="dual">
+    <!-- vLLM -->
+    <div class="panel vllm-panel">
+      <div class="ptitle ptitle-v">vLLM · PagedAttention + APC</div>
+      <div style="font-size:10px;color:#4a6080;margin-bottom:5px">物理显存 Block（每块=16 token）</div>
+      <div class="block-row" id="v-blocks"></div>
+      <div style="font-size:10px;color:#4a6080;margin:6px 0 3px">Block Table（逻辑→物理映射）</div>
+      <div id="v-table" style="font-family:monospace;font-size:10px;color:#5a7090;line-height:1.8;background:#0a0e18;border-radius:5px;padding:7px;min-height:36px"></div>
+      <div class="stats-row" id="v-stats"></div>
+      <div class="info" id="v-info"></div>
+    </div>
+    <!-- SGLang -->
+    <div class="panel sg-panel">
+      <div class="ptitle ptitle-s">SGLang · RadixAttention</div>
+      <div style="font-size:10px;color:#2a5838;margin-bottom:5px">Radix Tree（token 粒度索引）</div>
+      <div id="sg-tree" style="overflow-x:auto;padding-bottom:4px"></div>
+      <div class="stats-row" id="sg-stats"></div>
+      <div class="info" id="sg-info"></div>
+    </div>
+  </div>
+</div>
+
+<!-- GRANULARITY TAB -->
+<div class="section" id="tab-gran">
+  <div class="panel" style="margin-bottom:10px">
+    <div class="ptitle" style="color:#8ab4f8;border-bottom:1px solid #1e2438">命中粒度对比：前缀长度 = 18 token</div>
+    <p style="font-size:11px;color:#7a8aaa;margin-bottom:10px">拖动滑块改变共享前缀长度，观察两种方案各自能命中多少 token</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-size:11px;color:#7a8aaa;white-space:nowrap">前缀长度：</span>
+      <input type="range" id="prefix-len" min="1" max="48" value="18" style="flex:1;accent-color:#4a70aa" oninput="updateGran()">
+      <span id="prefix-val" style="font-size:13px;font-weight:700;color:#c0ccee;width:40px;text-align:right">18</span>
+      <span style="font-size:11px;color:#5a6888">token</span>
+    </div>
+    <div class="dual">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#6aacde;margin-bottom:6px">vLLM：以 16-token Block 为命中单位</div>
+        <div class="gran-wrap" id="gran-v"></div>
+        <div id="gran-v-stat" style="font-size:11px;margin-top:7px;line-height:1.8"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#5acf88;margin-bottom:6px">SGLang：以单 token 为命中单位</div>
+        <div class="gran-wrap" id="gran-s"></div>
+        <div id="gran-s-stat" style="font-size:11px;margin-top:7px;line-height:1.8"></div>
+      </div>
+    </div>
+    <div class="info" style="margin-top:10px" id="gran-info"></div>
+  </div>
+</div>
+
+<!-- STRUCTURE TAB -->
+<div class="section" id="tab-struct">
+  <div class="dual">
+    <div class="panel vllm-panel">
+      <div class="ptitle ptitle-v">vLLM 内部结构</div>
+      <svg viewBox="0 0 260 340" style="width:100%;background:#0a0e18;border-radius:7px">
+        <!-- 请求层 -->
+        <text x="130" y="18" text-anchor="middle" fill="#4a6080" font-size="10">逻辑层（Sequence视角）</text>
+        <rect x="20" y="24" width="220" height="26" rx="4" fill="#111d30" stroke="#3a6090" stroke-width="1.5"/>
+        <text x="130" y="41" text-anchor="middle" fill="#6aacde" font-size="11" font-weight="700">Sequence：[sys0-15][sys16-31][usr0-15][ans...]</text>
+        <!-- arrow -->
+        <line x1="130" y1="50" x2="130" y2="68" stroke="#2a3450" stroke-width="1.5"/>
+        <polygon points="126,68 134,68 130,75" fill="#2a3450"/>
+        <!-- Block Table -->
+        <text x="130" y="90" text-anchor="middle" fill="#4a6080" font-size="10">Block Table（CPU维护）</text>
+        <rect x="20" y="96" width="220" height="56" rx="4" fill="#0e1828" stroke="#2a4060"/>
+        <text x="30" y="113" fill="#5a8090" font-size="9" font-family="monospace">逻辑块0 → 物理块#7</text>
+        <text x="30" y="127" fill="#5a8090" font-size="9" font-family="monospace">逻辑块1 → 物理块#3</text>
+        <text x="30" y="141" fill="#5a8090" font-size="9" font-family="monospace">逻辑块2 → 物理块#12</text>
+        <!-- arrow -->
+        <line x1="130" y1="152" x2="130" y2="168" stroke="#2a3450" stroke-width="1.5"/>
+        <polygon points="126,168 134,168 130,175" fill="#2a3450"/>
+        <!-- Physical VRAM -->
+        <text x="130" y="190" text-anchor="middle" fill="#4a6080" font-size="10">物理显存（非连续块）</text>
+        <rect x="8" y="197" width="36" height="36" rx="3" fill="#111d30" stroke="#3a6090" stroke-width="1.5"/>
+        <text x="26" y="212" text-anchor="middle" fill="#6aacde" font-size="9">#3</text>
+        <text x="26" y="224" text-anchor="middle" fill="#4a6080" font-size="8">sys1</text>
+        <rect x="50" y="197" width="36" height="36" rx="3" fill="#151010" stroke="#5a2020" stroke-width="1"/>
+        <text x="68" y="212" text-anchor="middle" fill="#5a4040" font-size="9">#4</text>
+        <text x="68" y="224" text-anchor="middle" fill="#3a2828" font-size="8">free</text>
+        <rect x="92" y="197" width="36" height="36" rx="3" fill="#111d30" stroke="#3a6090" stroke-width="1.5"/>
+        <text x="110" y="212" text-anchor="middle" fill="#6aacde" font-size="9">#7</text>
+        <text x="110" y="224" text-anchor="middle" fill="#4a6080" font-size="8">sys0</text>
+        <rect x="134" y="197" width="36" height="36" rx="3" fill="#151010" stroke="#5a2020" stroke-width="1"/>
+        <text x="152" y="212" text-anchor="middle" fill="#5a4040" font-size="9">#8</text>
+        <text x="152" y="224" text-anchor="middle" fill="#3a2828" font-size="8">free</text>
+        <rect x="176" y="197" width="36" height="36" rx="3" fill="#111d30" stroke="#3a6090" stroke-width="1.5"/>
+        <text x="194" y="212" text-anchor="middle" fill="#6aacde" font-size="9">#12</text>
+        <text x="194" y="224" text-anchor="middle" fill="#4a6080" font-size="8">usr0</text>
+        <rect x="218" y="197" width="36" height="36" rx="3" fill="#0f1e14" stroke="#2a6040" stroke-width="1.5"/>
+        <text x="236" y="212" text-anchor="middle" fill="#5acf88" font-size="9">#15</text>
+        <text x="236" y="224" text-anchor="middle" fill="#3a8050" font-size="8">共享</text>
+        <!-- hash -->
+        <text x="130" y="256" text-anchor="middle" fill="#4a6080" font-size="10">Chain Hash（APC）</text>
+        <rect x="8" y="263" width="244" height="30" rx="4" fill="#0a0e18" stroke="#1e2438"/>
+        <text x="20" y="275" fill="#3a5070" font-size="8" font-family="monospace">hash(#7) = a1b2</text>
+        <text x="20" y="287" fill="#3a5070" font-size="8" font-family="monospace">hash(a1b2 + #3) = c3d4 → hash(c3d4+#12)= e5f6</text>
+        <!-- key trait -->
+        <rect x="8" y="302" width="244" height="32" rx="4" fill="#101830" stroke="#2a3a60"/>
+        <text x="20" y="315" fill="#6aacde" font-size="9" font-weight="700">核心特征</text>
+        <text x="20" y="328" fill="#4a6080" font-size="9">块不连续，Block Table 统一管理映射</text>
+      </svg>
+    </div>
+    <div class="panel sg-panel">
+      <div class="ptitle ptitle-s">SGLang 内部结构</div>
+      <svg viewBox="0 0 260 340" style="width:100%;background:#0a0e18;border-radius:7px">
+        <!-- 请求层 -->
+        <text x="130" y="18" text-anchor="middle" fill="#2a5038" font-size="10">所有请求共享同一颗树</text>
+        <!-- root -->
+        <rect x="105" y="24" width="50" height="24" rx="4" fill="#101a12" stroke="#2a5030" stroke-width="1.5"/>
+        <text x="130" y="40" text-anchor="middle" fill="#3a8050" font-size="10" font-weight="700">ROOT</text>
+        <!-- sys branch -->
+        <line x1="100" y1="48" x2="60" y2="70" stroke="#1a3020" stroke-width="1.2"/>
+        <rect x="20" y="70" width="78" height="24" rx="4" fill="#0e1e12" stroke="#2a6040" stroke-width="1.5"/>
+        <text x="59" y="86" text-anchor="middle" fill="#5acf88" font-size="9" font-weight="700">sys: "你是助手..."</text>
+        <!-- sys branch children -->
+        <line x1="50" y1="94" x2="35" y2="116" stroke="#1a3020" stroke-width="1.2"/>
+        <rect x="8" y="116" width="54" height="22" rx="4" fill="#0f2215" stroke="#2a5030" stroke-width="1.5"/>
+        <text x="35" y="131" text-anchor="middle" fill="#4aaf70" font-size="9">turn1用户A</text>
+        <line x1="50" y1="94" x2="72" y2="116" stroke="#1a3020" stroke-width="1.2"/>
+        <rect x="56" y="116" width="54" height="22" rx="4" fill="#0f2215" stroke="#2a5030" stroke-width="1.5"/>
+        <text x="83" y="131" text-anchor="middle" fill="#4aaf70" font-size="9">turn1用户B</text>
+        <!-- few-shot branch -->
+        <line x1="150" y1="48" x2="195" y2="70" stroke="#1a3020" stroke-width="1.2"/>
+        <rect x="158" y="70" width="84" height="24" rx="4" fill="#0e1e12" stroke="#2a6040" stroke-width="1.5"/>
+        <text x="200" y="86" text-anchor="middle" fill="#5acf88" font-size="9" font-weight="700">few-shot例子×3</text>
+        <!-- few-shot children -->
+        <line x1="192" y1="94" x2="175" y2="116" stroke="#1a3020" stroke-width="1.2"/>
+        <rect x="148" y="116" width="52" height="22" rx="4" fill="#0f2215" stroke="#2a5030" stroke-width="1.5"/>
+        <text x="174" y="131" text-anchor="middle" fill="#4aaf70" font-size="9">问题A</text>
+        <line x1="208" y1="94" x2="220" y2="116" stroke="#1a3020" stroke-width="1.2"/>
+        <rect x="196" y="116" width="52" height="22" rx="4" fill="#0f2215" stroke="#2a5030" stroke-width="1.5"/>
+        <text x="222" y="131" text-anchor="middle" fill="#4aaf70" font-size="9">问题B</text>
+        <!-- evict label -->
+        <text x="130" y="162" text-anchor="middle" fill="#3a5030" font-size="10">LRU 驱逐策略（叶优先）</text>
+        <rect x="8" y="170" width="244" height="50" rx="4" fill="#0a0e18" stroke="#1a2818"/>
+        <text x="20" y="185" fill="#2a4830" font-size="8">• 引用计数（lock_ref）：正在使用的节点不能驱逐</text>
+        <text x="20" y="198" fill="#2a4830" font-size="8">• 驱逐顺序：先驱逐最久未使用的叶节点</text>
+        <text x="20" y="211" fill="#2a4830" font-size="8">• 父节点共享：只要任一子节点存活，父节点不驱逐</text>
+        <!-- page size -->
+        <text x="130" y="238" text-anchor="middle" fill="#3a5030" font-size="10">存储单元</text>
+        <rect x="8" y="245" width="244" height="24" rx="4" fill="#0a1210" stroke="#1a3018"/>
+        <text x="130" y="261" text-anchor="middle" fill="#3a8050" font-size="9" font-family="monospace">每个 page_size = 1 token（不同于vLLM的16）</text>
+        <!-- key trait -->
+        <rect x="8" y="278" width="244" height="54" rx="4" fill="#0a1810" stroke="#1a3820"/>
+        <text x="20" y="292" fill="#5acf88" font-size="9" font-weight="700">核心特征</text>
+        <text x="20" y="306" fill="#3a6048" font-size="9">树结构存储在 CPU，维护开销极小</text>
+        <text x="20" y="320" fill="#3a6048" font-size="9">多请求天然共享前缀节点，无需手动配置</text>
+        <text x="20" y="332" fill="#3a6048" font-size="9">前端 fork 提示 + 深度优先调度提升命中率</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- TABLE TAB -->
+<div class="section" id="tab-table">
+  <div class="panel" style="border-color:#2a3050">
+    <div class="ptitle" style="color:#8ab4f8;border-color:#2a3050">全维度对比表</div>
+    <table class="cmp-table">
+      <tr><th style="width:22%">维度</th><th style="width:39%">vLLM（PagedAttention + APC）</th><th style="width:39%">SGLang（RadixAttention）</th></tr>
+      <tr><td style="color:#7a8aaa">缓存粒度</td>
+          <td><span class="hl hl-v">16-token Block</span>，前缀必须对齐到块边界才能命中</td>
+          <td><span class="hl hl-s">单 token（page_size=1）</span>，任意长度公共前缀全部命中</td></tr>
+      <tr><td style="color:#7a8aaa">索引结构</td>
+          <td>Block Table（逻辑块→物理块哈希表）+ Chain Hash</td>
+          <td>Radix Tree（压缩前缀树，CPU维护，O(L)查找）</td></tr>
+      <tr><td style="color:#7a8aaa">命中方式</td>
+          <td>Hash 精确匹配：block内容的哈希值相同才命中</td>
+          <td>前缀匹配：match_prefix 沿树走，走多远复用多长</td></tr>
+      <tr><td style="color:#7a8aaa">驱逐策略</td>
+          <td>LRU（块级），由调度器统一管理</td>
+          <td>LRU（叶优先），lock_ref 保护运行中节点，父节点随子节点自然共享</td></tr>
+      <tr><td style="color:#7a8aaa">显存布局</td>
+          <td>非连续物理块，Block Table 统一映射；支持 Copy-on-Write 共享</td>
+          <td>非连续 paged 布局，每 page = 1 token；树节点存 CPU，KV 存 GPU</td></tr>
+      <tr><td style="color:#7a8aaa">多请求共享</td>
+          <td>相同 Block Hash → 物理块共享（需 APC 开启，块对齐）</td>
+          <td>自动：所有请求共用同一棵树，公共前缀天然共享节点</td></tr>
+      <tr><td style="color:#7a8aaa">调度优化</td>
+          <td>Block-aware 调度；WAITING/RUNNING/PREEMPTED 三状态</td>
+          <td>Longest-Matched-Prefix-First（深度优先近似），理论最优命中率</td></tr>
+      <tr><td style="color:#7a8aaa">最大优势场景</td>
+          <td>通用批量推理、长输出、无共享前缀；内存利用率高</td>
+          <td>多轮对话、RAG、Few-shot、同 system prompt 高并发；高复用率</td></tr>
+      <tr><td style="color:#7a8aaa">典型命中率</td>
+          <td>APC 开启时：system prompt 场景 60-80%</td>
+          <td>Chatbot Arena 实测：Vicuna-33B <span class="hl hl-s">74.1%</span>，LLaVA-34B <span class="hl hl-s">52.4%</span></td></tr>
+      <tr><td style="color:#7a8aaa">开销</td>
+          <td>Block Table 维护 O(1)；Chain Hash 计算在 block 填满时</td>
+          <td>树操作 O(L)，L=序列长度；实测额外开销 <span class="hl hl-s">&lt;0.3%</span></td></tr>
+    </table>
+    <div class="info" style="margin-top:10px">
+      <span class="hl" style="color:#8ab4f8">一句话总结：</span>两者都解决了"KV Cache 如何高效复用"，但切入角度不同。vLLM 以块为单位做显存管理（类比 OS 虚拟内存），重点在显存利用率；SGLang 以 token 为粒度做前缀索引（类比文件系统前缀树），重点在最大化命中覆盖。两者差异在高复用负载下才会显现。
+    </div>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────
+// SCENE DATA
+// ────────────────────────────────────────────────
+const SCENES = [
+  { // 0: first request
+    name:'① 首次请求（缓存为空）',
+    vBlocks:[
+      {label:'Block#0\nsys tok0-15',cls:'sys',hit:false,hash:'a1b2'},
+      {label:'Block#1\nsys tok16-31',cls:'sys',hit:false,hash:'c3d4'},
+      {label:'Block#2\nusr tok0-15',cls:'usr',hit:false,hash:'e5f6'},
+    ],
+    vTableLines:['逻辑0 → 物理#5  hash:a1b2','逻辑1 → 物理#11 hash:c3d4','逻辑2 → 物理#2  hash:e5f6'],
+    vHit:0,vTotal:3,
+    vInfo:'缓存完全为空，3个块全部需要计算并存入缓存。这是所谓"冷启动"。之后相同的系统提示就能被复用。',
+    sgTree:[
+      {label:'ROOT',cls:'neutral',children:[
+        {label:'[全新请求]\nsys+usr内容',cls:'new',children:[]}
+      ]}
+    ],
+    sgHit:0,sgTotal:48,
+    sgInfo:'首次请求，Radix Tree 为空，全部 48 token 需要计算。计算完成后，整条路径作为新节点插入树中。',
+  },
+  { // 1: same system prompt
+    name:'② 第二条请求（相同系统提示，不同问题）',
+    vBlocks:[
+      {label:'Block#0\nsys tok0-15',cls:'sys',hit:true,hash:'a1b2 ✓'},
+      {label:'Block#1\nsys tok16-31',cls:'sys',hit:true,hash:'c3d4 ✓'},
+      {label:'Block#2\nusr tok0-15',cls:'usr',hit:false,hash:'f7g8 ✗'},
+    ],
+    vTableLines:['逻辑0 → 物理#5  hash:a1b2 ✓命中','逻辑1 → 物理#11 hash:c3d4 ✓命中','逻辑2 → 物理#9  hash:f7g8 (新)'],
+    vHit:2,vTotal:3,
+    vInfo:'Block#0 和 Block#1 的哈希与缓存完全一致，直接复用！跳过了 32 token 的 prefill。Block#2 是新问题，需要重新计算。',
+    sgTree:[
+      {label:'ROOT',cls:'neutral',children:[
+        {label:'sys前缀\n(tok 0-31)',cls:'hit',children:[
+          {label:'问题1（旧）',cls:'neutral',children:[]},
+          {label:'问题2（新）',cls:'new',children:[]}
+        ]}
+      ]}
+    ],
+    sgHit:32,sgTotal:48,
+    sgInfo:'系统提示节点（32 token）完全命中！新问题作为新子节点分叉出去，共享相同的祖先节点KV Cache。',
+  },
+  { // 2: 18-token prefix (non-block-aligned)
+    name:'③ 18-token 共享前缀（跨块边界）',
+    vBlocks:[
+      {label:'Block#0\ntok0-15 ✓',cls:'sys',hit:true,hash:'a1b2'},
+      {label:'Block#1\ntok16-17+新',cls:'miss',hit:false,hash:'??xx ✗'},
+      {label:'Block#2\n继续新内容',cls:'new',hit:false,hash:'新计算'},
+    ],
+    vTableLines:['逻辑0 → 物理#5 hash:a1b2 ✓命中','逻辑1 → 物理#新 (tok16-17合并新内容, hash变了)','      ↑ 尾部2token无法单独成块，与新内容合并后hash不匹配'],
+    vHit:1,vTotal:3,
+    vInfo:'⚠️ 关键局限：18 token = 16（整块）+ 2（零头）。vLLM 只能命中前16个token（Block#0），最后2个token因为凑不成整块，与新内容合在一起，导致Block#1的hash与缓存不符，整个块重算。',
+    sgTree:[
+      {label:'ROOT',cls:'neutral',children:[
+        {label:'tok0-15\n（16个）✓',cls:'hit',children:[
+          {label:'tok16-17\n（2个）✓',cls:'hit',children:[
+            {label:'新内容',cls:'new',children:[]}
+          ]}
+        ]}
+      ]}
+    ],
+    sgHit:18,sgTotal:18+16,
+    sgInfo:'✅ SGLang 完整命中 18 token！Radix Tree 沿路径走：先匹配16个，再匹配2个，都在树中找到了对应节点。只有后面的新内容需要重算。这就是 token 粒度 vs 块粒度的核心差距。',
+  },
+  { // 3: multi-turn turn 3
+    name:'④ 多轮对话——第 3 轮（历史累积）',
+    vBlocks:[
+      {label:'Block#0\nsys ✓',cls:'sys',hit:true,hash:'a1b2'},
+      {label:'Block#1\nturn1 ✓',cls:'usr',hit:true,hash:'b2c3'},
+      {label:'Block#2\nturn2 ✓',cls:'usr',hit:true,hash:'c3d4'},
+      {label:'Block#3\nturn3新',cls:'new',hit:false,hash:'新'},
+    ],
+    vTableLines:['逻辑0 → 物理#5  ✓命中','逻辑1 → 物理#8  ✓命中（turn1完整16tok）','逻辑2 → 物理#13 ✓命中（turn2完整16tok）','逻辑3 → 物理#新  需要计算（turn3）'],
+    vHit:3,vTotal:4,
+    vInfo:'多轮对话时，如果每轮消息恰好是16token的整数倍，vLLM可以完美命中历史。但实际消息长度不固定，常有余数导致末尾块失效。',
+    sgTree:[
+      {label:'ROOT',cls:'neutral',children:[
+        {label:'sys',cls:'hit',children:[
+          {label:'turn1\n（任意长）✓',cls:'hit',children:[
+            {label:'turn2\n（任意长）✓',cls:'hit',children:[
+              {label:'turn3\n（新）',cls:'new',children:[]}
+            ]}
+          ]}
+        ]}
+      ]}
+    ],
+    sgHit:48,sgTotal:64,
+    sgInfo:'多轮对话是 SGLang 的主场。无论每轮消息长度是否为 16 的倍数，Radix Tree 都能精确命中所有历史内容。轮数越多、历史越长，相对优势越显著。',
+  },
+];
+
+let curScene=0;
+
+function renderScene(i){
+  curScene=i;
+  document.querySelectorAll('[id^="sc"]').forEach((b,j)=>b.classList.toggle('active',j===i));
+  const sc=SCENES[i];
+
+  // vLLM blocks
+  const vb=document.getElementById('v-blocks');
+  vb.innerHTML='';
+  sc.vBlocks.forEach(b=>{
+    const d=document.createElement('div');
+    d.className='block '+(b.hit?'hit':b.cls);
+    d.innerHTML=b.label.replace('\n','<br>')+`<span style="font-size:8px;opacity:.7;margin-top:1px">${b.hash}</span>`;
+    vb.appendChild(d);
+  });
+
+  // vLLM table
+  document.getElementById('v-table').innerHTML=sc.vTableLines.map(l=>
+    `<div style="color:${l.includes('✓')?'#4aaf70':l.includes('✗')||l.includes('新')?'#c05030':'#4a6080'}">${l}</div>`
+  ).join('');
+
+  // vLLM stats
+  const hp=sc.vHit/sc.vTotal;
+  document.getElementById('v-stats').innerHTML=`
+    <div class="stat"><div class="snum hl-v">${sc.vHit}</div><div class="slbl">命中块</div></div>
+    <div class="stat"><div class="snum hl-miss">${sc.vTotal-sc.vHit}</div><div class="slbl">未命中块</div></div>
+    <div class="stat"><div class="snum" style="color:${hp>0.6?'#5acf88':hp>0?'#c0a050':'#e05030'}">${Math.round(hp*100)}%</div><div class="slbl">命中率</div></div>
+    <div class="stat"><div class="snum hl-hit">${sc.vHit*16}</div><div class="slbl">节省token</div></div>`;
+  document.getElementById('v-info').innerHTML=sc.vInfo;
+
+  // SGLang tree
+  document.getElementById('sg-tree').innerHTML=renderTree(sc.sgTree);
+
+  // SGLang stats
+  const shp=sc.sgHit/sc.sgTotal;
+  document.getElementById('sg-stats').innerHTML=`
+    <div class="stat"><div class="snum hl-s">${sc.sgHit}</div><div class="slbl">命中token</div></div>
+    <div class="stat"><div class="snum hl-miss">${sc.sgTotal-sc.sgHit}</div><div class="slbl">未命中token</div></div>
+    <div class="stat"><div class="snum" style="color:${shp>0.6?'#5acf88':shp>0?'#c0a050':'#e05030'}">${Math.round(shp*100)}%</div><div class="slbl">命中率</div></div>
+    <div class="stat"><div class="snum hl-hit">${sc.sgHit}</div><div class="slbl">节省token</div></div>`;
+  document.getElementById('sg-info').innerHTML=sc.sgInfo;
+}
+
+function renderTree(nodes,depth=0){
+  if(!nodes||nodes.length===0)return'';
+  return nodes.map(n=>`
+    <div style="display:inline-flex;flex-direction:column;align-items:center;margin:0 3px;vertical-align:top">
+      <div class="tree-node ${n.cls}" style="font-size:${depth===0?11:10}px">
+        ${n.label.replace('\n','<br>')}
+      </div>
+      ${n.children&&n.children.length>0?`
+        <div style="display:flex;gap:4px;margin-top:3px;position:relative">
+          <div style="position:absolute;top:-2px;left:50%;border-left:1px solid #1a3020;height:6px"></div>
+          ${renderTree(n.children,depth+1)}
+        </div>
+      `:''}
+    </div>
+  `).join(`<span style="color:#1a3020;font-size:18px;vertical-align:top;margin-top:6px"> </span>`);
+}
+
+function setScene(i){renderScene(i);}
+
+// ────────────────────────────────────────────────
+// GRANULARITY
+// ────────────────────────────────────────────────
+function updateGran(){
+  const len=parseInt(document.getElementById('prefix-len').value);
+  document.getElementById('prefix-val').textContent=len;
+
+  // vLLM: full blocks only
+  const fullBlocks=Math.floor(len/16);
+  const remainder=len%16;
+  const vHit=fullBlocks*16;
+  const vMiss=len-vHit;
+
+  // render vLLM
+  const gv=document.getElementById('gran-v');
+  gv.innerHTML='';
+  for(let i=0;i<fullBlocks;i++){
+    const d=document.createElement('div');
+    d.className='gran-blk';
+    d.style.cssText=`width:${Math.min(58,580/Math.max(len,16))}px;height:36px;background:#0a1e12;border-color:#1a8050;color:#40d880`;
+    d.innerHTML=`<span style="font-size:9px">Blk${i}</span><span style="font-size:8px;opacity:.7">✓16tok</span>`;
+    gv.appendChild(d);
+  }
+  if(remainder>0){
+    const d=document.createElement('div');
+    d.className='gran-blk';
+    d.style.cssText=`width:${Math.min(58,580/Math.max(len,16))*remainder/16}px;height:36px;background:#200808;border-color:#803020;color:#e05030;min-width:28px`;
+    d.innerHTML=`<span style="font-size:9px">部分</span><span style="font-size:8px;opacity:.7">✗${remainder}tok</span>`;
+    gv.appendChild(d);
+  }
+  document.getElementById('gran-v-stat').innerHTML=
+    `命中：<span style="color:#40d880;font-weight:700">${vHit} token</span>（${fullBlocks}整块）<br>` +
+    `未命中：<span style="color:#e05030;font-weight:700">${vMiss} token</span>（${remainder>0?'余数凑不成块':'无余数，完美对齐'}）<br>` +
+    `命中率：<span style="color:${vHit>0?'#c0a050':'#e05030'};font-weight:700">${len>0?Math.round(vHit/len*100):0}%</span>`;
+
+  // SGLang: all tokens hit
+  const gs=document.getElementById('gran-s');
+  gs.innerHTML='';
+  const tw=Math.min(12,580/Math.max(len,1));
+  for(let i=0;i<len;i++){
+    const d=document.createElement('div');
+    d.className='gran-blk';
+    d.style.cssText=`width:${tw}px;height:36px;background:#0a1e12;border-color:#1a8050;color:#40d880;min-width:${tw}px`;
+    d.innerHTML='';
+    gv.title=`tok${i}`;
+    gs.appendChild(d);
+  }
+  document.getElementById('gran-s-stat').innerHTML=
+    `命中：<span style="color:#40d880;font-weight:700">${len} token</span>（全部）<br>` +
+    `未命中：<span style="color:#4a5878;font-weight:700">0 token</span><br>` +
+    `命中率：<span style="color:#5acf88;font-weight:700">100%</span>`;
+
+  document.getElementById('gran-info').innerHTML=
+    len%16===0
+    ? `✅ 前缀长度 ${len} 是 16 的整数倍——两者在这种情况下命中率相同（${len}/${len}=100%）。vLLM 对整块对齐的场景没有损失。`
+    : `⚠️ 前缀长度 ${len}：vLLM 命中 <strong style="color:#40d880">${vHit}</strong> token（${Math.round(vHit/len*100)}%），SGLang 命中 <strong style="color:#5acf88">${len}</strong> token（100%）。差距来自余数 ${remainder} 个 token——vLLM 无法为它们单独成块，必须重算；SGLang 逐 token 追踪，一个不浪费。`;
+}
+
+// init
+renderScene(0);
+updateGran();
+
+function sw(name){
+  const tabs=['scene','gran','struct','table'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',tabs[i]===name));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+}
+</script>
+</body>
+</html>

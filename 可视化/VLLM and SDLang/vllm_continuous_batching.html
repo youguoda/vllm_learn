@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e8eaf6;padding:16px;font-size:13px}
+h2{color:#7c9ef8;font-size:16px;margin-bottom:3px}
+.sub{color:#9aa3b8;font-size:11px;margin-bottom:14px}
+.layout{display:flex;gap:12px;flex-wrap:wrap}
+.panel{background:#1a1d2e;border-radius:10px;padding:13px}
+.ptitle{font-size:11px;font-weight:700;color:#7c9ef8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.btn{background:#2d3561;border:none;border-radius:6px;color:#c8d0f8;padding:7px 12px;cursor:pointer;font-size:12px;margin:2px;transition:background .2s}
+.btn:hover{background:#3d4a80}
+.btn.go{background:#3d5ab0;color:#fff}
+.btn.run{background:#1a4030;color:#6ac880}
+.info-box{background:#12152a;border-radius:7px;padding:10px;font-size:11px;line-height:1.7;color:#b0b8d8}
+.timeline-row{display:flex;align-items:center;gap:4px;margin-bottom:3px;height:28px}
+.iter-label{width:52px;font-size:10px;color:#5a6080;flex-shrink:0;text-align:right;padding-right:4px}
+.slot{height:24px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;transition:all .3s;min-width:28px}
+.slot-empty{background:#12182a;border:1px dashed #2a3060;color:#2a3060}
+.slot-a{background:#1a2a40;border:1px solid #4c8ab0;color:#7ab8e8}
+.slot-b{background:#1a3020;border:1px solid #3a8040;color:#6ac880}
+.slot-c{background:#2a1a30;border:1px solid #7040a0;color:#b080e0}
+.slot-d{background:#2a200a;border:1px solid #907030;color:#d0b060}
+.slot-e{background:#2a1010;border:1px solid #8a3020;color:#e07050}
+.slot-wait{background:#1e1020;border:1px dashed #5040a0;color:#7060c0}
+.waiting-queue{display:flex;gap:4px;flex-wrap:wrap;min-height:28px;margin:6px 0}
+.req-chip{padding:4px 9px;border-radius:5px;font-size:11px;font-weight:700;cursor:default}
+.stat-row{display:flex;gap:8px;margin-top:8px}
+.stat{flex:1;background:#12152a;border-radius:6px;padding:7px;text-align:center}
+.stat-n{font-size:18px;font-weight:700}
+.stat-l{font-size:9px;color:#6070a0}
+.tab-row{display:flex;gap:5px;margin-bottom:10px}
+.tab{padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;background:#1e2340;color:#6070a0;border:1.5px solid #2a3060}
+.tab.active{background:#2d3561;color:#c8d0f8;border-color:#4c5fb0}
+.section{display:none}.section.active{display:block}
+.state-badge{display:inline-block;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700}
+.badge-run{background:#1a3020;color:#4caf7d}
+.badge-wait{background:#2a200a;color:#d0a020}
+.badge-pre{background:#2a1010;color:#e06060}
+</style>
+</head>
+<body>
+<h2>⚡ Continuous Batching 交互演示</h2>
+<p class="sub">iteration 级调度 vs 传统静态批处理——GPU 永远不闲着</p>
+
+<div class="tab-row">
+  <div class="tab active" onclick="sw('compare')">📊 两种方案对比</div>
+  <div class="tab" onclick="sw('sim')">🎮 调度器模拟</div>
+  <div class="tab" onclick="sw('state')">🔄 三状态机</div>
+</div>
+
+<!-- 对比图 -->
+<div class="section active" id="tab-compare">
+  <div class="layout">
+    <div class="panel" style="flex:1">
+      <div class="ptitle">❌ 静态批处理（Static Batching）</div>
+      <div style="overflow-x:auto">
+        <svg viewBox="0 0 480 170" style="width:100%;min-width:340px;background:#12152a;border-radius:7px">
+          <text x="8" y="16" fill="#6070a0" font-size="10">时间轴 →</text>
+          <!-- header -->
+          <text x="50" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t1</text>
+          <text x="130" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t2</text>
+          <text x="210" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t3</text>
+          <text x="290" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t4</text>
+          <text x="370" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t5</text>
+          <text x="450" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t6</text>
+          <!-- Seq A 长 -->
+          <text x="5" y="38" fill="#7ab8e8" font-size="10" text-anchor="end">Seq A</text>
+          <rect x="12" y="24" width="456" height="20" rx="3" fill="#1a2a40" stroke="#4c8ab0" stroke-width="1"/>
+          <text x="240" y="37" text-anchor="middle" fill="#7ab8e8" font-size="10">生成中（6步，最长）</text>
+          <!-- Seq B 短 -->
+          <text x="5" y="62" fill="#6ac880" font-size="10" text-anchor="end">Seq B</text>
+          <rect x="12" y="48" width="156" height="20" rx="3" fill="#1a3020" stroke="#3a8040" stroke-width="1"/>
+          <text x="90" y="61" text-anchor="middle" fill="#6ac880" font-size="10">完成（2步）</text>
+          <rect x="170" y="48" width="298" height="20" rx="3" fill="#12182a" stroke="#2a3060" stroke-width="1" stroke-dasharray="3"/>
+          <text x="320" y="61" text-anchor="middle" fill="#3a4060" font-size="10">等待 A 完成（浪费）</text>
+          <!-- Seq C 短 -->
+          <text x="5" y="86" fill="#b080e0" font-size="10" text-anchor="end">Seq C</text>
+          <rect x="12" y="72" width="76" height="20" rx="3" fill="#2a1a30" stroke="#7040a0" stroke-width="1"/>
+          <text x="50" y="85" text-anchor="middle" fill="#b080e0" font-size="10">完成(1步)</text>
+          <rect x="90" y="72" width="378" height="20" rx="3" fill="#12182a" stroke="#2a3060" stroke-width="1" stroke-dasharray="3"/>
+          <text x="280" y="85" text-anchor="middle" fill="#3a4060" font-size="10">等待 A 和 B 完成（大量浪费）</text>
+          <!-- 新请求等待 -->
+          <text x="5" y="110" fill="#7060c0" font-size="10" text-anchor="end">新请求D</text>
+          <rect x="12" y="96" width="456" height="20" rx="3" fill="#1e1020" stroke="#5040a0" stroke-width="1" stroke-dasharray="4"/>
+          <text x="240" y="109" text-anchor="middle" fill="#6060c0" font-size="10">在队列中等待整批完成……（高延迟）</text>
+          <!-- GPU 利用率 -->
+          <text x="5" y="148" fill="#9aa3b8" font-size="10" text-anchor="end">GPU利用率</text>
+          <rect x="12" y="134" width="456" height="16" rx="3" fill="#12182a" stroke="#2a3060"/>
+          <rect x="12" y="134" width="456" height="16" rx="3" fill="#3d1a1a" opacity="0.5"/>
+          <text x="240" y="145" text-anchor="middle" fill="#e06060" font-size="9">约 40-60%（短序列完成后 GPU 大量空转等待长序列）</text>
+        </svg>
+      </div>
+    </div>
+    <div class="panel" style="flex:1">
+      <div class="ptitle">✅ Continuous Batching（iteration 级调度）</div>
+      <div style="overflow-x:auto">
+        <svg viewBox="0 0 480 170" style="width:100%;min-width:340px;background:#12152a;border-radius:7px">
+          <text x="8" y="16" fill="#6070a0" font-size="10">时间轴 →</text>
+          <text x="50" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t1</text>
+          <text x="130" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t2</text>
+          <text x="210" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t3</text>
+          <text x="290" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t4</text>
+          <text x="370" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t5</text>
+          <text x="450" y="16" fill="#5a6080" font-size="9" text-anchor="middle">t6</text>
+          <!-- Seq A -->
+          <text x="5" y="38" fill="#7ab8e8" font-size="10" text-anchor="end">Seq A</text>
+          <rect x="12" y="24" width="456" height="20" rx="3" fill="#1a2a40" stroke="#4c8ab0" stroke-width="1"/>
+          <text x="240" y="37" text-anchor="middle" fill="#7ab8e8" font-size="10">持续生成（全程）</text>
+          <!-- Seq B 完成后立刻有D -->
+          <text x="5" y="62" fill="#6ac880" font-size="10" text-anchor="end">Seq B/D</text>
+          <rect x="12" y="48" width="156" height="20" rx="3" fill="#1a3020" stroke="#3a8040" stroke-width="1"/>
+          <text x="90" y="61" text-anchor="middle" fill="#6ac880" font-size="10">B完成</text>
+          <rect x="170" y="48" width="298" height="20" rx="3" fill="#2a200a" stroke="#907030" stroke-width="1"/>
+          <text x="320" y="61" text-anchor="middle" fill="#d0b060" font-size="10">D 立刻插入，无需等待！</text>
+          <!-- Seq C 完成后立刻有E -->
+          <text x="5" y="86" fill="#b080e0" font-size="10" text-anchor="end">Seq C/E</text>
+          <rect x="12" y="72" width="76" height="20" rx="3" fill="#2a1a30" stroke="#7040a0" stroke-width="1"/>
+          <text x="50" y="85" text-anchor="middle" fill="#b080e0" font-size="10">C完成</text>
+          <rect x="90" y="72" width="378" height="20" rx="3" fill="#2a1010" stroke="#8a3020" stroke-width="1"/>
+          <text x="280" y="85" text-anchor="middle" fill="#e07050" font-size="10">E 立刻插入，无等待！</text>
+          <!-- 无等待 -->
+          <text x="5" y="110" fill="#4caf7d" font-size="10" text-anchor="end">新请求</text>
+          <rect x="12" y="96" width="456" height="20" rx="3" fill="#0f2518" stroke="#2a5030" stroke-width="1" stroke-dasharray="2"/>
+          <text x="240" y="109" text-anchor="middle" fill="#4caf7d" font-size="10">有空位即插入，等待时间 ≈ 0</text>
+          <!-- GPU 利用率 -->
+          <text x="5" y="148" fill="#9aa3b8" font-size="10" text-anchor="end">GPU利用率</text>
+          <rect x="12" y="134" width="456" height="16" rx="3" fill="#12182a" stroke="#2a3060"/>
+          <rect x="12" y="134" width="456" height="16" rx="3" fill="#1a4030" opacity="0.8"/>
+          <text x="240" y="145" text-anchor="middle" fill="#4caf7d" font-size="9">接近 100%（每个 iteration GPU 都在满负载处理）</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 调度器模拟 -->
+<div class="section" id="tab-sim">
+  <div class="layout">
+    <div class="panel" style="flex:1;min-width:280px">
+      <div class="ptitle">实时调度模拟（最大并发=3）</div>
+      <div style="font-size:11px;color:#6070a0;margin-bottom:4px">WAITING 队列</div>
+      <div class="waiting-queue" id="wait-queue"></div>
+      <div style="font-size:11px;color:#6070a0;margin-bottom:4px">RUNNING 批次（当前 iteration）</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="run-slots"></div>
+      <div style="margin:8px 0">
+        <button class="btn go" onclick="simStep()">▶ 执行一次 iteration</button>
+        <button class="btn" onclick="addReq()">➕ 新请求到达</button>
+        <button class="btn" onclick="resetSim()">↺</button>
+      </div>
+      <div class="info-box" id="sim-info">点击"新请求到达"向队列加入请求，再点"执行iteration"观察调度。</div>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-n" style="color:#7c9ef8" id="s-iter">0</div><div class="stat-l">iteration数</div></div>
+        <div class="stat"><div class="stat-n" style="color:#4caf7d" id="s-done">0</div><div class="stat-l">完成请求</div></div>
+        <div class="stat"><div class="stat-n" style="color:#ffd060" id="s-gpu">100%</div><div class="stat-l">GPU利用率</div></div>
+      </div>
+    </div>
+    <div class="panel" style="flex:0 0 160px">
+      <div class="ptitle">iteration 日志</div>
+      <div id="iter-log" style="font-size:10px;line-height:1.8;color:#8090b0;max-height:220px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 三状态机 -->
+<div class="section" id="tab-state">
+  <div class="panel">
+    <div class="ptitle">vLLM 调度器三状态机</div>
+    <svg viewBox="0 0 500 200" style="width:100%;max-width:500px;background:#12152a;border-radius:8px">
+      <!-- WAITING -->
+      <ellipse cx="90" cy="100" rx="72" ry="32" fill="#1e1020" stroke="#5040a0" stroke-width="2"/>
+      <text x="90" y="96" text-anchor="middle" fill="#9080e0" font-size="12" font-weight="700">WAITING</text>
+      <text x="90" y="110" text-anchor="middle" fill="#6060a0" font-size="9">等待显存空间</text>
+      <!-- RUNNING -->
+      <ellipse cx="260" cy="100" rx="72" ry="32" fill="#0f2518" stroke="#2a7040" stroke-width="2"/>
+      <text x="260" y="96" text-anchor="middle" fill="#50c080" font-size="12" font-weight="700">RUNNING</text>
+      <text x="260" y="110" text-anchor="middle" fill="#308050" font-size="9">GPU 正在处理</text>
+      <!-- PREEMPTED -->
+      <ellipse cx="420" cy="100" rx="70" ry="32" fill="#2a1010" stroke="#7a3020" stroke-width="2"/>
+      <text x="420" y="96" text-anchor="middle" fill="#e06050" font-size="12" font-weight="700">PREEMPTED</text>
+      <text x="420" y="110" text-anchor="middle" fill="#904030" font-size="9">被抢占，等待恢复</text>
+
+      <!-- WAITING → RUNNING -->
+      <path d="M162,88 L188,88" stroke="#3a6080" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="175" y="82" text-anchor="middle" fill="#5a8090" font-size="9">有空间</text>
+      <!-- RUNNING → WAITING (done) -->
+      <path d="M188,112 L162,112" stroke="#304060" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="175" y="128" text-anchor="middle" fill="#405060" font-size="9">生成完成</text>
+      <!-- RUNNING → PREEMPTED -->
+      <path d="M332,88 L350,88" stroke="#703020" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="341" y="82" text-anchor="middle" fill="#804030" font-size="9">显存不足</text>
+      <!-- PREEMPTED → WAITING -->
+      <path d="M380,68 Q260,20 140,68" stroke="#503080" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+      <text x="265" y="25" text-anchor="middle" fill="#6040a0" font-size="9">recompute 策略：丢弃KV Cache回到等待</text>
+      <!-- PREEMPTED → RUNNING swap-->
+      <path d="M350,112 L332,112" stroke="#703020" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="341" y="128" text-anchor="middle" fill="#804030" font-size="9">swap回GPU</text>
+      <!-- 箭头定义 -->
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#5a8090" stroke-width="1.2"/></marker>
+        <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#405060" stroke-width="1.2"/></marker>
+      </defs>
+      <!-- 说明 -->
+      <text x="10" y="165" fill="#9aa3b8" font-size="10">抢占策略：</text>
+      <text x="10" y="180" fill="#7080b0" font-size="10">• recompute（重算）：丢弃被抢占序列的 KV Cache，重新排队，代价是下次要重算前缀</text>
+      <text x="10" y="195" fill="#7080b0" font-size="10">• swap（换出）：把 KV Cache 搬到 CPU 内存，恢复时搬回 GPU，代价是 PCIe 传输</text>
+    </svg>
+    <div class="info-box" style="margin-top:8px">
+      <strong style="color:#c8d0f8">为什么需要抢占？</strong><br>
+      decode 是自回归的，序列长度不确定。一个序列开始时显存够用，生成到一半可能因为其他请求涌入而显存不足。vLLM 通过抢占+重排队来动态腾出空间，保证 GPU 始终有请求可以处理。
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 调度器模拟 ──────────────────────────────────
+const COLORS=['#7ab8e8','#6ac880','#b080e0','#d0b060','#e07050','#80d0d0','#f0a060'];
+const BG=['#1a2a40','#1a3020','#2a1a30','#2a200a','#2a1010','#102a2a','#2a1a10'];
+const BD=['#4c8ab0','#3a8040','#7040a0','#907030','#8a3020','#3a9090','#906030'];
+let waiting=[], running=[], done=0, iters=0, reqId=0;
+const NAMES='ABCDEFGHIJKLMN';
+
+function makeReq(){
+  const id=reqId++;
+  return {id,name:NAMES[id%14],remain:Math.floor(Math.random()*4)+2,color:COLORS[id%7],bg:BG[id%7],bd:BD[id%7]};
+}
+
+function renderSim(){
+  const wq=document.getElementById('wait-queue');
+  wq.innerHTML='';
+  waiting.forEach(r=>{
+    const d=document.createElement('div');
+    d.className='req-chip';
+    d.style.cssText=`background:${r.bg};border:1.5px solid ${r.bd};color:${r.color}`;
+    d.textContent=`${r.name}(${r.remain}步)`;
+    wq.appendChild(d);
+  });
+  if(waiting.length===0) wq.innerHTML='<span style="color:#3a4060;font-size:11px">（空）</span>';
+
+  const rs=document.getElementById('run-slots');
+  rs.innerHTML='';
+  for(let i=0;i<3;i++){
+    const d=document.createElement('div');
+    if(i<running.length){
+      const r=running[i];
+      d.className='req-chip';
+      d.style.cssText=`background:${r.bg};border:2px solid ${r.bd};color:${r.color};padding:6px 12px`;
+      d.textContent=`${r.name} 剩${r.remain}步`;
+    } else {
+      d.style.cssText='background:#12182a;border:1.5px dashed #2a3060;color:#3a4060;padding:6px 12px;border-radius:6px;font-size:11px';
+      d.textContent='空槽';
+    }
+    rs.appendChild(d);
+  }
+  document.getElementById('s-iter').textContent=iters;
+  document.getElementById('s-done').textContent=done;
+  const gpuUtil=running.length>0?'~'+Math.round(running.length/3*100)+'%':'0%';
+  document.getElementById('s-gpu').textContent=gpuUtil;
+}
+
+function addReq(){
+  waiting.push(makeReq());
+  // 填满空槽
+  while(running.length<3&&waiting.length>0) running.push(waiting.shift());
+  renderSim();
+  document.getElementById('sim-info').textContent=`新请求加入。当前 running: ${running.length}, waiting: ${waiting.length}`;
+}
+
+function simStep(){
+  if(running.length===0&&waiting.length===0){
+    document.getElementById('sim-info').textContent='没有请求。请先点"新请求到达"。';return;
+  }
+  iters++;
+  const log=document.getElementById('iter-log');
+  let logLine=`<div style="border-bottom:1px solid #1e2340;padding:2px 0">Iter ${iters}：`;
+  const finished=[];
+  running.forEach(r=>{
+    r.remain--;
+    if(r.remain<=0){finished.push(r);done++;}
+  });
+  running=running.filter(r=>r.remain>0);
+  finished.forEach(r=>{logLine+=`<span style="color:#4caf7d">${r.name}✓ </span>`;});
+  
+  // 立刻补入等待队列中的请求（Continuous Batching 核心）
+  const filled=[];
+  while(running.length<3&&waiting.length>0){
+    const nr=waiting.shift();
+    running.push(nr);
+    filled.push(nr);
+  }
+  filled.forEach(r=>{logLine+=`<span style="color:#ffd060">${r.name}↑ </span>`;});
+  if(finished.length===0&&filled.length===0) logLine+='<span style="color:#6070a0">处理中</span>';
+  logLine+=`</div>`;
+  log.innerHTML=logLine+log.innerHTML;
+  
+  const info=finished.length>0
+    ?`${finished.map(r=>r.name).join(',')} 完成！${filled.length>0?'立刻插入 '+filled.map(r=>r.name).join(',')+'（Continuous Batching！）':''}` 
+    :`执行中：${running.map(r=>r.name+'(剩'+r.remain+')').join(', ')}`;
+  document.getElementById('sim-info').textContent=info;
+  renderSim();
+}
+
+function resetSim(){waiting=[];running=[];done=0;iters=0;reqId=0;document.getElementById('iter-log').innerHTML='';document.getElementById('sim-info').textContent='点击"新请求到达"向队列加入请求，再点"执行iteration"观察调度。';renderSim();}
+
+renderSim();
+
+function sw(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['compare','sim','state'][i]===name));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+</script>
+</body>
+</html>

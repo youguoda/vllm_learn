@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e8eaf6;padding:16px;font-size:13px}
+h2{color:#7c9ef8;font-size:16px;margin-bottom:3px}
+.sub{color:#9aa3b8;font-size:11px;margin-bottom:14px}
+.layout{display:flex;gap:12px;flex-wrap:wrap}
+.panel{background:#1a1d2e;border-radius:10px;padding:13px}
+.ptitle{font-size:11px;font-weight:700;color:#7c9ef8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.btn{background:#2d3561;border:none;border-radius:6px;color:#c8d0f8;padding:7px 12px;cursor:pointer;font-size:12px;margin:2px;transition:background .2s}
+.btn:hover{background:#3d4a80}
+.btn.go{background:#3d5ab0;color:#fff}
+.mem-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:8px}
+.blk{height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:1.5px solid;transition:all .3s;cursor:default}
+.blk-free{background:#12182a;border-color:#2a3060;color:#3a4060}
+.blk-seq1{background:#1a2a40;border-color:#4c8ab0;color:#7ab8e8}
+.blk-seq2{background:#1a3020;border-color:#3a8040;color:#6ac880}
+.blk-seq3{background:#2a1a30;border-color:#7040a0;color:#b080e0}
+.blk-shared{background:#2a2010;border-color:#907030;color:#d0b060}
+.blk-waste{background:#2a1010;border-color:#8a3020;color:#e07050;opacity:.6}
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl th{color:#7c9ef8;padding:5px 8px;border-bottom:1px solid #2a3060;text-align:left;font-weight:700}
+.tbl td{padding:5px 8px;border-bottom:1px solid #1e2340;color:#b0b8d8;font-family:monospace}
+.info-box{background:#12152a;border-radius:7px;padding:10px;font-size:11px;line-height:1.7;color:#b0b8d8;margin-top:8px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.leg{display:flex;align-items:center;gap:4px;font-size:10px}
+.dot{width:10px;height:10px;border-radius:3px}
+.stat-row{display:flex;gap:8px;margin-top:8px}
+.stat{flex:1;background:#12152a;border-radius:6px;padding:7px;text-align:center}
+.stat-n{font-size:19px;font-weight:700}
+.stat-l{font-size:9px;color:#6070a0}
+.tab-row{display:flex;gap:5px;margin-bottom:10px}
+.tab{padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;background:#1e2340;color:#6070a0;border:1.5px solid #2a3060}
+.tab.active{background:#2d3561;color:#c8d0f8;border-color:#4c5fb0}
+.section{display:none}.section.active{display:block}
+</style>
+</head>
+<body>
+<h2>📦 PagedAttention 交互演示</h2>
+<p class="sub">KV Cache 像操作系统管理内存一样——按块分配，按需索引</p>
+
+<div class="tab-row">
+  <div class="tab active" onclick="sw('old')">❌ 传统方案：预分配</div>
+  <div class="tab" onclick="sw('paged')">✅ PagedAttention：分块</div>
+  <div class="tab" onclick="sw('share')">🔗 Copy-on-Write 共享</div>
+</div>
+
+<!-- 传统方案 -->
+<div class="section active" id="tab-old">
+  <div class="layout">
+    <div class="panel" style="flex:1;min-width:260px">
+      <div class="ptitle">物理显存（共32块，每块=16 token KV）</div>
+      <div class="legend">
+        <div class="leg"><div class="dot" style="background:#4c8ab0"></div>Seq A（已用）</div>
+        <div class="leg"><div class="dot" style="background:#3a8040"></div>Seq B（已用）</div>
+        <div class="leg"><div class="dot" style="background:#8a3020;opacity:.6"></div>预分配但浪费</div>
+        <div class="leg"><div class="dot" style="background:#2a3060"></div>空闲</div>
+      </div>
+      <div class="mem-grid" id="old-grid"></div>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-n" style="color:#f07070" id="old-used">0</div><div class="stat-l">已占块</div></div>
+        <div class="stat"><div class="stat-n" style="color:#e07050" id="old-waste">0</div><div class="stat-l">浪费块</div></div>
+        <div class="stat"><div class="stat-n" style="color:#4caf7d" id="old-eff">0%</div><div class="stat-l">利用率</div></div>
+      </div>
+      <div style="margin-top:8px">
+        <button class="btn go" onclick="addSeqOld()">➕ 加入新序列</button>
+        <button class="btn" onclick="resetOld()">↺ 重置</button>
+      </div>
+      <div class="info-box" id="old-info">每条序列按最大长度（128 token = 8块）预分配连续空间。点击"加入新序列"观察内存浪费。</div>
+    </div>
+    <div class="panel" style="flex:0 0 200px">
+      <div class="ptitle">问题分析</div>
+      <div class="info-box" style="margin-bottom:8px">
+        <strong style="color:#f07070">内部碎片</strong><br>
+        Seq B 实际只生成了 40 token（2.5块），却占了 8 块的连续空间，<strong>尾部 5.5块白占着</strong>。
+      </div>
+      <div class="info-box" style="margin-bottom:8px">
+        <strong style="color:#f07070">外部碎片</strong><br>
+        剩余空闲块<strong>不连续</strong>，新的大序列放不进去，即使总空间够也不行。
+      </div>
+      <div class="info-box">
+        <strong style="color:#f07070">结论</strong><br>
+        论文数据：传统方案 KV Cache 有效利用率仅 <strong>20-40%</strong>，严重限制并发数。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PagedAttention -->
+<div class="section" id="tab-paged">
+  <div class="layout">
+    <div class="panel" style="flex:1;min-width:260px">
+      <div class="ptitle">物理显存（32块，按需动态分配）</div>
+      <div class="legend">
+        <div class="leg"><div class="dot" style="background:#4c8ab0"></div>Seq A</div>
+        <div class="leg"><div class="dot" style="background:#3a8040"></div>Seq B</div>
+        <div class="leg"><div class="dot" style="background:#7040a0"></div>Seq C</div>
+        <div class="leg"><div class="dot" style="background:#2a3060"></div>空闲</div>
+      </div>
+      <div class="mem-grid" id="paged-grid"></div>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-n" style="color:#4caf7d" id="pg-used">0</div><div class="stat-l">已用块</div></div>
+        <div class="stat"><div class="stat-n" style="color:#4caf7d" id="pg-waste">0</div><div class="stat-l">浪费块（尾块）</div></div>
+        <div class="stat"><div class="stat-n" style="color:#4caf7d" id="pg-eff">100%</div><div class="stat-l">利用率</div></div>
+      </div>
+      <div style="margin-top:8px">
+        <button class="btn go" onclick="addTokPaged()">▶ 生成一个token</button>
+        <button class="btn go" style="background:#1a4030" onclick="addSeqPaged()">➕ 新序列加入</button>
+        <button class="btn" onclick="resetPaged()">↺</button>
+      </div>
+      <div class="info-box" id="pg-info">按需分配：每生成16个token才申请一个新块。块不必连续——Block Table负责映射。</div>
+    </div>
+    <div class="panel" style="flex:0 0 220px">
+      <div class="ptitle">Block Table（逻辑→物理映射）</div>
+      <table class="tbl" id="bt-table">
+        <tr><th>序列</th><th>逻辑块</th><th>物理块</th><th>已填token</th></tr>
+      </table>
+      <div class="info-box" style="margin-top:8px">
+        逻辑块：序列"认为"自己连续占有<br>物理块：实际分配的任意位置<br><br>
+        <strong style="color:#7c9ef8">类比：</strong>操作系统的虚拟内存页表——程序看到的连续地址，实际映射到散落的物理页。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Copy-on-Write -->
+<div class="section" id="tab-share">
+  <div class="layout">
+    <div class="panel" style="flex:1">
+      <div class="ptitle">Beam Search / Parallel Sampling 的块共享</div>
+      <div class="info-box" style="margin-bottom:10px">
+        <strong style="color:#c8d0f8">场景：</strong>用户要求"给我3种不同的续写方案"（parallel sampling）<br>
+        3条输出路径<strong>共享相同的 prompt KV</strong>，只有各自新生成的部分才占独立的块。
+      </div>
+      <svg viewBox="0 0 520 240" style="width:100%;max-width:520px;background:#12152a;border-radius:8px;padding:8px">
+        <!-- prompt blocks shared -->
+        <text x="10" y="20" fill="#7c9ef8" font-size="11" font-weight="700">Prompt KV（共享，引用计数=3）</text>
+        <rect x="10" y="28" width="55" height="28" rx="4" fill="#2a200a" stroke="#907030" stroke-width="1.5"/>
+        <text x="37" y="46" text-anchor="middle" fill="#d0b060" font-size="10">块#0</text>
+        <rect x="72" y="28" width="55" height="28" rx="4" fill="#2a200a" stroke="#907030" stroke-width="1.5"/>
+        <text x="99" y="46" text-anchor="middle" fill="#d0b060" font-size="10">块#1</text>
+        <rect x="134" y="28" width="55" height="28" rx="4" fill="#2a200a" stroke="#907030" stroke-width="1.5"/>
+        <text x="161" y="46" text-anchor="middle" fill="#d0b060" font-size="10">块#2</text>
+        <text x="200" y="46" fill="#5060a0" font-size="18">→</text>
+
+        <!-- fork arrow -->
+        <text x="10" y="90" fill="#9aa3b8" font-size="11">生成开始，3条路径分叉（写时复制 Copy-on-Write）</text>
+        <line x1="161" y1="56" x2="100" y2="105" stroke="#3a4060" stroke-width="1.5" stroke-dasharray="4"/>
+        <line x1="161" y1="56" x2="260" y2="105" stroke="#3a4060" stroke-width="1.5" stroke-dasharray="4"/>
+        <line x1="161" y1="56" x2="420" y2="105" stroke="#3a4060" stroke-width="1.5" stroke-dasharray="4"/>
+
+        <!-- seq A -->
+        <text x="60" y="103" fill="#7ab8e8" font-size="10" text-anchor="middle">路径A</text>
+        <rect x="30" y="108" width="55" height="28" rx="4" fill="#1a2a40" stroke="#4c8ab0" stroke-width="1.5"/>
+        <text x="57" y="126" text-anchor="middle" fill="#7ab8e8" font-size="10">块#5(A)</text>
+        <rect x="92" y="108" width="55" height="28" rx="4" fill="#1a2a40" stroke="#4c8ab0" stroke-width="1.5"/>
+        <text x="119" y="126" text-anchor="middle" fill="#7ab8e8" font-size="10">块#8(A)</text>
+
+        <!-- seq B -->
+        <text x="220" y="103" fill="#6ac880" font-size="10" text-anchor="middle">路径B</text>
+        <rect x="190" y="108" width="55" height="28" rx="4" fill="#1a3020" stroke="#3a8040" stroke-width="1.5"/>
+        <text x="217" y="126" text-anchor="middle" fill="#6ac880" font-size="10">块#6(B)</text>
+        <rect x="252" y="108" width="55" height="28" rx="4" fill="#1a3020" stroke="#3a8040" stroke-width="1.5"/>
+        <text x="279" y="126" text-anchor="middle" fill="#6ac880" font-size="10">块#9(B)</text>
+
+        <!-- seq C -->
+        <text x="380" y="103" fill="#b080e0" font-size="10" text-anchor="middle">路径C</text>
+        <rect x="350" y="108" width="55" height="28" rx="4" fill="#2a1a30" stroke="#7040a0" stroke-width="1.5"/>
+        <text x="377" y="126" text-anchor="middle" fill="#b080e0" font-size="10">块#7(C)</text>
+        <rect x="412" y="108" width="55" height="28" rx="4" fill="#2a1a30" stroke="#7040a0" stroke-width="1.5"/>
+        <text x="439" y="126" text-anchor="middle" fill="#b080e0" font-size="10">块#10(C)</text>
+
+        <!-- saving -->
+        <text x="10" y="175" fill="#9aa3b8" font-size="11">显存节省分析</text>
+        <rect x="10" y="183" width="500" height="40" rx="5" fill="#121820"/>
+        <text x="20" y="199" fill="#f07070" font-size="11">传统方案：3条路径各自复制完整prompt KV = 3×3块 = 9块</text>
+        <text x="20" y="217" fill="#4caf7d" font-size="11">PagedAttention Copy-on-Write：共享3块 + 各自新增 = 3+6 = 9→ 实际只占 <tspan font-weight="700">3+6=9块</tspan>，节省 <tspan font-weight="700" fill="#ffd060">6块</tspan> 显存</text>
+      </svg>
+      <div class="info-box" style="margin-top:8px">
+        <strong style="color:#c8d0f8">Copy-on-Write 规则：</strong>只要一个物理块被多条序列引用（引用计数&gt;1），任何人想修改它时都必须先复制一份。Prompt 部分只读，所以永远不需要复制，自然共享。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 传统方案模拟 ──────────────────────────────────
+const TOTAL=32;
+let oldBlocks=Array(TOTAL).fill('free');
+let seqCount=0;
+const SEQ_COLORS=['seq1','seq2','seq3'];
+const SEQ_ACTUAL=[3,2,5,4]; // 每条序列实际用的块数（最大8）
+const MAX_ALLOC=8;
+
+function renderOld(){
+  const g=document.getElementById('old-grid');
+  g.innerHTML='';
+  let used=0,waste=0;
+  oldBlocks.forEach((b,i)=>{
+    const d=document.createElement('div');
+    d.className='blk blk-'+b;
+    d.textContent=b==='free'?'':b==='waste'?'✗':String.fromCharCode(65+parseInt(b.slice(-1))-1);
+    g.appendChild(d);
+    if(b!=='free')used++;
+    if(b==='waste')waste++;
+  });
+  const realUsed=used-waste;
+  document.getElementById('old-used').textContent=used;
+  document.getElementById('old-waste').textContent=waste;
+  document.getElementById('old-eff').textContent=used>0?Math.round(realUsed/used*100)+'%':'—';
+}
+
+function addSeqOld(){
+  if(seqCount>=3){document.getElementById('old-info').innerHTML='<span style="color:#f07070">显存已满，无法加入新序列！即使有空闲块也因为不连续而无法使用。</span>';return;}
+  const actual=SEQ_ACTUAL[seqCount];
+  // 找连续8块
+  let start=-1;
+  for(let i=0;i<=TOTAL-MAX_ALLOC;i++){
+    if(oldBlocks.slice(i,i+MAX_ALLOC).every(b=>b==='free')){start=i;break;}
+  }
+  if(start===-1){document.getElementById('old-info').innerHTML='<span style="color:#f07070">没有连续的8块空间！外部碎片导致加入失败。</span>';return;}
+  for(let i=start;i<start+MAX_ALLOC;i++){
+    oldBlocks[i]=(i<start+actual)?SEQ_COLORS[seqCount]:'waste';
+  }
+  const wasted=MAX_ALLOC-actual;
+  document.getElementById('old-info').innerHTML=
+    `序列${String.fromCharCode(65+seqCount)} 实际生成 <strong style="color:#7ab8e8">${actual*16} token（${actual}块）</strong>，但预分配了 <strong>8块</strong>，<span style="color:#f07070">浪费 ${wasted} 块（${wasted*16} token 空间）</span>`;
+  seqCount++;renderOld();
+}
+function resetOld(){seqCount=0;oldBlocks=Array(TOTAL).fill('free');document.getElementById('old-info').textContent='每条序列按最大长度（128 token = 8块）预分配连续空间。点击"加入新序列"观察内存浪费。';renderOld();}
+renderOld();
+
+// ── PagedAttention 模拟 ──────────────────────────────────
+let pgBlocks=Array(TOTAL).fill(null); // null=空闲, {seq,logical,tokens}
+let pgSeqs=[]; // {name,color,logicals:[{phys,tokens}]}
+let pgFree=[...Array(TOTAL).keys()];
+
+function renderPaged(){
+  const g=document.getElementById('paged-grid');
+  g.innerHTML='';
+  pgBlocks.forEach((b,i)=>{
+    const d=document.createElement('div');
+    if(!b){d.className='blk blk-free';d.textContent='';}
+    else{
+      const cls={'A':'seq1','B':'seq2','C':'seq3'}[b.seq]||'seq1';
+      d.className='blk blk-'+cls;
+      d.textContent=b.seq+(b.logical+1);
+      d.title=`${b.seq} 逻辑块${b.logical} → 物理块${i}，${b.tokens}/16 token`;
+    }
+    g.appendChild(d);
+  });
+  // block table
+  const bt=document.getElementById('bt-table');
+  bt.innerHTML='<tr><th>序列</th><th>逻辑块</th><th>物理块</th><th>token数</th></tr>';
+  let used=0,tail=0;
+  pgSeqs.forEach(seq=>{
+    seq.logicals.forEach((l,li)=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td style="color:${{ A:'#7ab8e8',B:'#6ac880',C:'#b080e0'}[seq.name]}">${seq.name}</td><td>${li}</td><td>#${l.phys}</td><td>${l.tokens}/16</td>`;
+      bt.appendChild(tr);
+      used++;
+      if(li===seq.logicals.length-1&&l.tokens<16)tail++;
+    });
+  });
+  document.getElementById('pg-used').textContent=used;
+  document.getElementById('pg-waste').textContent=tail;
+  document.getElementById('pg-eff').textContent=used>0?Math.round((used-tail)/used*100)+'%':'100%';
+}
+
+function getFreeBlock(){return pgFree.splice(0,1)[0];}
+
+function addSeqPaged(){
+  if(pgSeqs.length>=3){document.getElementById('pg-info').innerHTML='演示最多3条序列';return;}
+  const names=['A','B','C'];
+  const name=names[pgSeqs.length];
+  const phys=getFreeBlock();
+  if(phys===undefined){document.getElementById('pg-info').innerHTML='<span style="color:#f07070">显存已满</span>';return;}
+  pgBlocks[phys]={seq:name,logical:0,tokens:1};
+  pgSeqs.push({name,logicals:[{phys,tokens:1}]});
+  document.getElementById('pg-info').innerHTML=`序列 <strong style="color:#7ab8e8">${name}</strong> 加入，分配第一个物理块 #${phys}。<strong>无需预分配</strong>，按需获取。`;
+  renderPaged();
+}
+
+function addTokPaged(){
+  if(pgSeqs.length===0){document.getElementById('pg-info').innerHTML='先点"新序列加入"';return;}
+  // 随机选一条序列生成token
+  const seq=pgSeqs[Math.floor(Math.random()*pgSeqs.length)];
+  const lastL=seq.logicals[seq.logicals.length-1];
+  if(lastL.tokens<16){
+    lastL.tokens++;
+    pgBlocks[lastL.phys].tokens=lastL.tokens;
+    if(lastL.tokens===16){
+      document.getElementById('pg-info').innerHTML=`序列 <strong>${seq.name}</strong> 当前块填满（16 token），下次生成将自动申请新块。`;
+    } else {
+      document.getElementById('pg-info').innerHTML=`序列 <strong>${seq.name}</strong> 在物理块 #${lastL.phys} 写入第 ${lastL.tokens}/16 个 token。`;
+    }
+  } else {
+    const phys=getFreeBlock();
+    if(phys===undefined){document.getElementById('pg-info').innerHTML='<span style="color:#f07070">显存满</span>';return;}
+    const newL={phys,tokens:1};
+    seq.logicals.push(newL);
+    pgBlocks[phys]={seq:seq.name,logical:seq.logicals.length-1,tokens:1};
+    document.getElementById('pg-info').innerHTML=`序列 <strong>${seq.name}</strong> 申请新物理块 #${phys}（逻辑块 ${seq.logicals.length-1}）。块可以不连续！`;
+  }
+  renderPaged();
+}
+
+function resetPaged(){pgBlocks=Array(TOTAL).fill(null);pgSeqs=[];pgFree=[...Array(TOTAL).keys()];document.getElementById('pg-info').textContent='按需分配：每生成16个token才申请一个新块。块不必连续——Block Table负责映射。';document.getElementById('bt-table').innerHTML='<tr><th>序列</th><th>逻辑块</th><th>物理块</th><th>已填token</th></tr>';renderPaged();}
+renderPaged();
+
+function sw(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['old','paged','share'][i]===name));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+</script>
+</body>
+</html>

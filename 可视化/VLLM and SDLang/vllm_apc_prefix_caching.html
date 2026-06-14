@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e8eaf6;padding:16px;font-size:13px}
+h2{color:#7c9ef8;font-size:16px;margin-bottom:3px}
+.sub{color:#9aa3b8;font-size:11px;margin-bottom:14px}
+.layout{display:flex;gap:12px;flex-wrap:wrap}
+.panel{background:#1a1d2e;border-radius:10px;padding:13px}
+.ptitle{font-size:11px;font-weight:700;color:#7c9ef8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.btn{background:#2d3561;border:none;border-radius:6px;color:#c8d0f8;padding:7px 12px;cursor:pointer;font-size:12px;margin:2px;transition:background .2s}
+.btn:hover{background:#3d4a80}
+.btn.go{background:#3d5ab0;color:#fff}
+.info-box{background:#12152a;border-radius:7px;padding:10px;font-size:11px;line-height:1.7;color:#b0b8d8}
+.blk-row{display:flex;align-items:center;gap:4px;margin:4px 0;flex-wrap:wrap}
+.blk{height:34px;min-width:70px;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:1.5px solid;transition:all .4s;padding:2px 6px;text-align:center}
+.blk-sys{background:#1a2a40;border-color:#4c8ab0;color:#7ab8e8}
+.blk-user{background:#1a3020;border-color:#3a8040;color:#6ac880}
+.blk-new{background:#2a1a30;border-color:#7040a0;color:#b080e0}
+.blk-hit{background:#0f2518;border-color:#2a9060;color:#4cdf90;animation:glow .6s ease-in-out}
+.blk-miss{background:#2a1010;border-color:#8a3020;color:#f07050}
+.blk-partial{background:#2a200a;border-color:#907030;color:#d0b060}
+.blk-empty{background:#12182a;border-color:#2a3060;color:#3a4060}
+@keyframes glow{0%{box-shadow:0 0 0 rgba(42,144,96,0);}50%{box-shadow:0 0 12px rgba(42,144,96,.5);}100%{box-shadow:none;}}
+.arrow{color:#3a4060;font-size:18px;padding:0 2px}
+.hash-tag{font-family:monospace;font-size:9px;opacity:.7;margin-top:1px}
+.stat-row{display:flex;gap:8px;margin-top:8px}
+.stat{flex:1;background:#12152a;border-radius:6px;padding:7px;text-align:center}
+.stat-n{font-size:18px;font-weight:700}
+.stat-l{font-size:9px;color:#6070a0}
+.tab-row{display:flex;gap:5px;margin-bottom:10px}
+.tab{padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;background:#1e2340;color:#6070a0;border:1.5px solid #2a3060}
+.tab.active{background:#2d3561;color:#c8d0f8;border-color:#4c5fb0}
+.section{display:none}.section.active{display:block}
+.label{font-size:10px;color:#5a6080;margin-bottom:2px}
+.badge{display:inline-block;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700}
+.badge-hit{background:#0f2518;color:#4caf7d}
+.badge-miss{background:#2a1010;color:#f07070}
+</style>
+</head>
+<body>
+<h2>🔑 APC（自动前缀缓存）交互演示</h2>
+<p class="sub">chain hash + LRU eviction — 相同 prefix 只算一次</p>
+
+<div class="tab-row">
+  <div class="tab active" onclick="sw('how')">🔍 工作原理</div>
+  <div class="tab" onclick="sw('sim')">🎮 缓存模拟</div>
+  <div class="tab" onclick="sw('limit')">⚠️ vLLM的局限 vs SGLang</div>
+</div>
+
+<!-- 工作原理 -->
+<div class="section active" id="tab-how">
+  <div class="layout">
+    <div class="panel" style="flex:1;min-width:280px">
+      <div class="ptitle">Chain Hash：每个 block 的哈希依赖前面所有 block</div>
+      <div class="info-box" style="margin-bottom:10px">
+        每个 block（16 token）的哈希值 = <strong style="color:#7c9ef8">hash(前一个block的哈希, 本block的token序列)</strong><br>
+        → 只要前缀中任意一个 token 变了，后面所有 block 的哈希都会变，保证唯一性
+      </div>
+      <svg viewBox="0 0 500 160" style="width:100%;background:#12152a;border-radius:8px">
+        <!-- 请求1的block chain -->
+        <text x="10" y="18" fill="#7c9ef8" font-size="10" font-weight="700">请求①的 block chain</text>
+        <!-- block 0: system prompt part1 -->
+        <rect x="10" y="26" width="90" height="38" rx="5" fill="#1a2a40" stroke="#4c8ab0" stroke-width="1.5"/>
+        <text x="55" y="41" text-anchor="middle" fill="#7ab8e8" font-size="10">Block 0</text>
+        <text x="55" y="54" text-anchor="middle" fill="#5a7090" font-size="9">[sys tok 0-15]</text>
+        <text x="55" y="63" text-anchor="middle" fill="#3a5070" font-size="8">hash: a1b2</text>
+        <!-- arrow -->
+        <text x="104" y="48" fill="#3a4060" font-size="16">→</text>
+        <!-- block 1 -->
+        <rect x="116" y="26" width="90" height="38" rx="5" fill="#1a2a40" stroke="#4c8ab0" stroke-width="1.5"/>
+        <text x="161" y="41" text-anchor="middle" fill="#7ab8e8" font-size="10">Block 1</text>
+        <text x="161" y="54" text-anchor="middle" fill="#5a7090" font-size="9">[sys tok 16-31]</text>
+        <text x="161" y="63" text-anchor="middle" fill="#3a5070" font-size="8">hash(a1b2+...)=c3d4</text>
+        <!-- arrow -->
+        <text x="210" y="48" fill="#3a4060" font-size="16">→</text>
+        <!-- block 2: user query -->
+        <rect x="222" y="26" width="90" height="38" rx="5" fill="#1a3020" stroke="#3a8040" stroke-width="1.5"/>
+        <text x="267" y="41" text-anchor="middle" fill="#6ac880" font-size="10">Block 2</text>
+        <text x="267" y="54" text-anchor="middle" fill="#406050" font-size="9">[user: 帮我...]</text>
+        <text x="267" y="63" text-anchor="middle" fill="#305040" font-size="8">hash(c3d4+...)=e5f6</text>
+        <!-- arrow -->
+        <text x="316" y="48" fill="#3a4060" font-size="16">→</text>
+        <!-- block 3: answer partial -->
+        <rect x="328" y="26" width="90" height="38" rx="5" fill="#2a1a30" stroke="#7040a0" stroke-width="1.5"/>
+        <text x="373" y="41" text-anchor="middle" fill="#b080e0" font-size="10">Block 3</text>
+        <text x="373" y="54" text-anchor="middle" fill="#604080" font-size="9">[answer...]</text>
+        <text x="373" y="63" text-anchor="middle" fill="#503070" font-size="8">hash(e5f6+...)=g7h8</text>
+
+        <!-- 请求2：相同system prompt -->
+        <text x="10" y="90" fill="#7c9ef8" font-size="10" font-weight="700">请求②（相同系统提示，不同问题）</text>
+        <rect x="10" y="98" width="90" height="38" rx="5" fill="#0f2518" stroke="#2a9060" stroke-width="2"/>
+        <text x="55" y="113" text-anchor="middle" fill="#4cdf90" font-size="10">Block 0</text>
+        <text x="55" y="126" text-anchor="middle" fill="#308050" font-size="9">hash: a1b2 ✓命中</text>
+        <text x="55" y="137" text-anchor="middle" fill="#4caf7d" font-size="8">↑ 复用，跳过计算</text>
+
+        <text x="104" y="120" fill="#3a4060" font-size="16">→</text>
+        <rect x="116" y="98" width="90" height="38" rx="5" fill="#0f2518" stroke="#2a9060" stroke-width="2"/>
+        <text x="161" y="113" text-anchor="middle" fill="#4cdf90" font-size="10">Block 1</text>
+        <text x="161" y="126" text-anchor="middle" fill="#308050" font-size="9">hash: c3d4 ✓命中</text>
+        <text x="161" y="137" text-anchor="middle" fill="#4caf7d" font-size="8">↑ 复用，跳过计算</text>
+
+        <text x="210" y="120" fill="#3a4060" font-size="16">→</text>
+        <rect x="222" y="98" width="90" height="38" rx="5" fill="#2a1010" stroke="#8a3020" stroke-width="1.5"/>
+        <text x="267" y="113" text-anchor="middle" fill="#f07050" font-size="10">Block 2'</text>
+        <text x="267" y="126" text-anchor="middle" fill="#804030" font-size="9">[user: 解释一下]</text>
+        <text x="267" y="137" text-anchor="middle" fill="#f07050" font-size="8">✗ 未命中，重新计算</text>
+
+        <text x="316" y="120" fill="#3a4060" font-size="16">→</text>
+        <rect x="328" y="98" width="90" height="38" rx="5" fill="#2a1010" stroke="#8a3020" stroke-width="1.5"/>
+        <text x="373" y="113" text-anchor="middle" fill="#f07050" font-size="10">Block 3'</text>
+        <text x="373" y="126" text-anchor="middle" fill="#804030" font-size="9">[answer...]</text>
+        <text x="373" y="137" text-anchor="middle" fill="#f07050" font-size="8">✗ 未命中，重新计算</text>
+      </svg>
+      <div class="info-box" style="margin-top:8px">
+        <strong style="color:#4caf7d">结论：</strong>请求②共4个block，其中Block 0和1与请求①完全相同（同样的系统提示），hash匹配 → 直接复用KV Cache，跳过这32个token的prefill计算。只需计算新的Block 2'和3'。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 缓存模拟 -->
+<div class="section" id="tab-sim">
+  <div class="layout">
+    <div class="panel" style="flex:1">
+      <div class="ptitle">点击"发送请求"，观察哪些块命中缓存</div>
+      <div style="margin-bottom:8px">
+        <button class="btn go" onclick="sendReq(0)">请求A：长系统提示 + 问题1</button>
+        <button class="btn go" onclick="sendReq(1)">请求B：长系统提示 + 问题2</button>
+        <button class="btn go" onclick="sendReq(2)">请求C：短系统提示 + 问题3</button>
+        <button class="btn go" onclick="sendReq(3)">请求D：无系统提示</button>
+        <button class="btn" onclick="clearCache()">🗑 清空缓存(LRU驱逐)</button>
+      </div>
+
+      <div class="label">请求的 Block 序列</div>
+      <div class="blk-row" id="req-blocks" style="min-height:40px"></div>
+
+      <div class="label" style="margin-top:8px">KV Cache 缓存槽（共6块容量）</div>
+      <div class="blk-row" id="cache-slots"></div>
+
+      <div class="stat-row">
+        <div class="stat"><div class="stat-n" style="color:#4caf7d" id="hit-count">0</div><div class="stat-l">命中块</div></div>
+        <div class="stat"><div class="stat-n" style="color:#f07070" id="miss-count">0</div><div class="stat-l">未命中块</div></div>
+        <div class="stat"><div class="stat-n" style="color:#7c9ef8" id="hit-rate">—</div><div class="stat-l">命中率</div></div>
+        <div class="stat"><div class="stat-n" style="color:#ffd060" id="ttft-save">—</div><div class="stat-l">节省prefill</div></div>
+      </div>
+      <div class="info-box" style="margin-top:8px" id="apc-info">点击上方请求按钮开始演示</div>
+    </div>
+  </div>
+</div>
+
+<!-- 局限 vs SGLang -->
+<div class="section" id="tab-limit">
+  <div class="panel">
+    <div class="ptitle">vLLM APC 的核心局限：必须对齐到 16-token block 边界</div>
+    <svg viewBox="0 0 500 210" style="width:100%;background:#12152a;border-radius:8px">
+      <!-- vLLM APC -->
+      <text x="10" y="18" fill="#f07070" font-size="11" font-weight="700">❌ vLLM APC：18-token 前缀，只能命中2个block（32token），尾部2token重算</text>
+      <!-- block grid 16tok each -->
+      <rect x="10" y="26" width="70" height="30" rx="4" fill="#0f2518" stroke="#2a9060" stroke-width="2"/>
+      <text x="45" y="38" text-anchor="middle" fill="#4cdf90" font-size="9">Block#0</text>
+      <text x="45" y="50" text-anchor="middle" fill="#308050" font-size="8">tok 0-15 ✓</text>
+
+      <rect x="86" y="26" width="70" height="30" rx="4" fill="#2a1010" stroke="#8a3020" stroke-width="1.5"/>
+      <text x="121" y="38" text-anchor="middle" fill="#f07050" font-size="9">Block#1</text>
+      <text x="121" y="50" text-anchor="middle" fill="#804030" font-size="8">tok 16-17 ✗未满</text>
+
+      <rect x="162" y="26" width="50" height="30" rx="4" fill="#2a1a30" stroke="#7040a0" stroke-width="1.5"/>
+      <text x="187" y="38" text-anchor="middle" fill="#b080e0" font-size="9">新内容</text>
+      <text x="187" y="50" text-anchor="middle" fill="#604080" font-size="8">重新计算</text>
+
+      <text x="230" y="45" fill="#5a6080" font-size="22">……</text>
+      <rect x="260" y="30" width="230" height="22" rx="4" fill="#121820"/>
+      <text x="375" y="45" text-anchor="middle" fill="#5a6080" font-size="10">问题：tok16-17 不满一块，无法复用，需重算</text>
+
+      <!-- 分隔线 -->
+      <line x1="10" y1="75" x2="490" y2="75" stroke="#2a3060" stroke-width="1" stroke-dasharray="4"/>
+
+      <!-- SGLang -->
+      <text x="10" y="92" fill="#4caf7d" font-size="11" font-weight="700">✅ SGLang RadixAttention：任意长度前缀，18 token 全部命中</text>
+      <!-- radix tree nodes -->
+      <rect x="10" y="100" width="140" height="30" rx="4" fill="#0f2518" stroke="#2a9060" stroke-width="2"/>
+      <text x="80" y="112" text-anchor="middle" fill="#4cdf90" font-size="9">tok 0-15（16个）✓</text>
+      <text x="80" y="124" text-anchor="middle" fill="#308050" font-size="8">Radix Tree 节点，命中</text>
+
+      <text x="154" y="118" fill="#3a4060" font-size="16">→</text>
+
+      <rect x="166" y="100" width="100" height="30" rx="4" fill="#0f2518" stroke="#2a9060" stroke-width="2"/>
+      <text x="216" y="112" text-anchor="middle" fill="#4cdf90" font-size="9">tok 16-17（2个）✓</text>
+      <text x="216" y="124" text-anchor="middle" fill="#308050" font-size="8">子节点，也命中！</text>
+
+      <text x="270" y="118" fill="#3a4060" font-size="16">→</text>
+
+      <rect x="286" y="100" width="90" height="30" rx="4" fill="#2a1a30" stroke="#7040a0" stroke-width="1.5"/>
+      <text x="331" y="112" text-anchor="middle" fill="#b080e0" font-size="9">新内容</text>
+      <text x="331" y="124" text-anchor="middle" fill="#604080" font-size="8">只算新的部分</text>
+
+      <!-- 对比表 -->
+      <rect x="10" y="145" width="480" height="55" rx="5" fill="#121820"/>
+      <text x="20" y="160" fill="#9aa3b8" font-size="10" font-weight="700">对比总结</text>
+      <text x="20" y="175" fill="#f07070" font-size="10">vLLM APC：以 block（16 token）为命中粒度，前缀必须是 16 的整数倍才能完全复用</text>
+      <text x="20" y="190" fill="#4caf7d" font-size="10">SGLang RadixAttention：以单 token 为粒度，任意长度公共前缀都能命中，不浪费一个 token</text>
+      <text x="20" y="200" fill="#ffd060" font-size="10">→ 多轮对话中历史消息长度不固定，SGLang 的优势在这里最明显</text>
+    </svg>
+    <div class="info-box" style="margin-top:8px">
+      <strong style="color:#c8d0f8">直觉理解：</strong><br>
+      vLLM APC 像是"只能按整张纸复印"——你有18页文档，只能复用前16页，最后2页还是要手抄。<br>
+      SGLang RadixAttention 像是"可以逐页复印"——18页全复用，一页都不浪费。
+    </div>
+  </div>
+</div>
+
+<script>
+// ── APC 缓存模拟 ──────────────────────────────────
+// 每个请求由若干 block 组成，block有唯一hash
+const REQUESTS = [
+  { // A: long sys + Q1
+    label:'A',
+    blocks:[
+      {id:'sys-0',label:'系统提示\ntok 0-15',cls:'blk-sys',hash:'a1b2'},
+      {id:'sys-1',label:'系统提示\ntok 16-31',cls:'blk-sys',hash:'c3d4'},
+      {id:'sys-2',label:'系统提示\ntok 32-47',cls:'blk-sys',hash:'e5f6'},
+      {id:'q1-0', label:'问题1\ntok 0-15', cls:'blk-user',hash:'q1aa'},
+    ]
+  },
+  { // B: same long sys + Q2
+    label:'B',
+    blocks:[
+      {id:'sys-0',label:'系统提示\ntok 0-15',cls:'blk-sys',hash:'a1b2'},
+      {id:'sys-1',label:'系统提示\ntok 16-31',cls:'blk-sys',hash:'c3d4'},
+      {id:'sys-2',label:'系统提示\ntok 32-47',cls:'blk-sys',hash:'e5f6'},
+      {id:'q2-0', label:'问题2\ntok 0-15', cls:'blk-user',hash:'q2bb'},
+    ]
+  },
+  { // C: short sys + Q3
+    label:'C',
+    blocks:[
+      {id:'sys-0',label:'系统提示\ntok 0-15',cls:'blk-sys',hash:'a1b2'},
+      {id:'q3-0', label:'问题3\ntok 0-15', cls:'blk-user',hash:'q3cc'},
+    ]
+  },
+  { // D: no sys
+    label:'D',
+    blocks:[
+      {id:'q4-0', label:'问题4\ntok 0-15', cls:'blk-new',hash:'q4dd'},
+      {id:'q4-1', label:'问题4\ntok 16-31',cls:'blk-new',hash:'q4ee'},
+    ]
+  }
+];
+
+// cache: LRU, max 6 blocks, stored as [{hash,id,label,cls,lru}]
+let cache=[], lruClock=0, totalHits=0, totalMiss=0;
+
+function renderCache(){
+  const el=document.getElementById('cache-slots');
+  el.innerHTML='';
+  for(let i=0;i<6;i++){
+    const d=document.createElement('div');
+    if(i<cache.length){
+      const b=cache[i];
+      d.className='blk '+b.cls;
+      d.innerHTML=b.label.replace('\n','<br>')+`<span class="hash-tag">${b.hash}</span>`;
+    } else {
+      d.className='blk blk-empty';
+      d.textContent='空';
+    }
+    el.appendChild(d);
+  }
+}
+
+function sendReq(idx){
+  const req=REQUESTS[idx];
+  const rb=document.getElementById('req-blocks');
+  rb.innerHTML='';
+  let hits=0,miss=0;
+  
+  req.blocks.forEach(blk=>{
+    const inCache=cache.find(c=>c.hash===blk.hash);
+    const d=document.createElement('div');
+    if(inCache){
+      d.className='blk blk-hit';
+      d.innerHTML=blk.label.replace('\n','<br>')+`<br><span style="font-size:9px;color:#4caf7d">✓ 命中</span>`;
+      inCache.lru=++lruClock;
+      hits++;
+    } else {
+      d.className='blk blk-miss';
+      d.innerHTML=blk.label.replace('\n','<br>')+`<br><span style="font-size:9px;color:#f07070">✗ 重算</span>`;
+      // insert to cache, evict LRU if full
+      if(cache.length>=6){
+        cache.sort((a,b)=>a.lru-b.lru);
+        cache.shift();
+      }
+      cache.push({...blk,lru:++lruClock});
+      miss++;
+    }
+    rb.appendChild(d);
+  });
+
+  totalHits+=hits; totalMiss+=miss;
+  const total=hits+miss;
+  const rate=Math.round(hits/total*100);
+  document.getElementById('hit-count').textContent=hits;
+  document.getElementById('miss-count').textContent=miss;
+  document.getElementById('hit-rate').textContent=rate+'%';
+  document.getElementById('ttft-save').textContent=(hits*16)+'tok';
+  
+  const infoMap={
+    0:'首次请求，缓存为空，所有块需要计算，结果存入缓存。',
+    1:`系统提示3块全部命中！节省了 ${hits>0?hits*16:0} token 的 prefill 计算，只需计算新的问题部分。这就是 APC 的核心价值。`,
+    2:`系统提示第一块命中（与A、B共享），后续问题3未命中。短系统提示的命中率更低。`,
+    3:`无系统提示，完全没有共享前缀，全部未命中，需要完整计算。`
+  };
+  document.getElementById('apc-info').innerHTML=
+    `<strong style="color:#c8d0f8">请求${req.label}：</strong>${infoMap[idx]}<br>` +
+    `命中 <span style="color:#4caf7d">${hits}</span> 块，未命中 <span style="color:#f07070">${miss}</span> 块，节省 <span style="color:#ffd060">${hits*16}</span> token 的 prefill`;
+  
+  renderCache();
+}
+
+function clearCache(){
+  cache=[];lruClock=0;totalHits=0;totalMiss=0;
+  document.getElementById('req-blocks').innerHTML='';
+  document.getElementById('hit-count').textContent=0;
+  document.getElementById('miss-count').textContent=0;
+  document.getElementById('hit-rate').textContent='—';
+  document.getElementById('ttft-save').textContent='—';
+  document.getElementById('apc-info').textContent='缓存已清空（模拟 LRU 驱逐后的状态）。重新发送请求观察效果。';
+  renderCache();
+}
+
+renderCache();
+
+function sw(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['how','sim','limit'][i]===name));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; background: var(--bg-primary, #0f1117); color: var(--text-primary, #e8eaf6); padding: 16px; font-size: 14px; }
+h2 { color: #7c9ef8; font-size: 16px; margin-bottom: 4px; }
+.subtitle { color: #9aa3b8; font-size: 12px; margin-bottom: 16px; }
+.layout { display: flex; gap: 16px; flex-wrap: wrap; }
+.panel { background: #1a1d2e; border-radius: 10px; padding: 14px; flex: 1; min-width: 260px; }
+.panel-title { font-size: 12px; font-weight: 700; color: #7c9ef8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.btn { background: #2d3561; border: none; border-radius: 6px; color: #c8d0f8; padding: 8px 14px; cursor: pointer; font-size: 13px; margin: 3px; transition: background 0.2s; }
+.btn:hover { background: #3d4a80; }
+.btn.active { background: #4c5fb0; color: #fff; }
+.req-list { display: flex; flex-direction: column; gap: 6px; }
+.req-item { border: 1.5px solid #2d3561; border-radius: 7px; padding: 8px 10px; cursor: pointer; transition: all 0.2s; font-size: 12px; line-height: 1.6; }
+.req-item:hover { border-color: #7c9ef8; background: #1e2340; }
+.req-item.selected { border-color: #7c9ef8; background: #1e2340; }
+.req-item .label { font-weight: 700; color: #7c9ef8; }
+.req-item .tokens { color: #b0b8d8; font-family: monospace; font-size: 11px; }
+.tree-area { min-height: 240px; position: relative; }
+svg.tree { width: 100%; height: 260px; }
+.info-box { background: #12152a; border-radius: 8px; padding: 12px; margin-top: 10px; font-size: 12px; line-height: 1.7; color: #b8c0d8; }
+.hit { color: #4caf7d; font-weight: 700; }
+.miss { color: #f07070; font-weight: 700; }
+.saved { color: #ffd060; font-weight: 700; }
+.tag { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 700; margin: 0 2px; }
+.tag-hit { background: #1a3d2a; color: #4caf7d; }
+.tag-miss { background: #3d1a1a; color: #f07070; }
+.step-counter { font-size: 11px; color: #5a6080; margin-bottom: 8px; }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; margin-bottom: 8px; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<h2>🌳 RadixAttention 交互演示</h2>
+<p class="subtitle">点击请求，观察 Radix Tree 如何复用 KV Cache</p>
+
+<div class="layout">
+  <div class="panel" style="flex:0 0 220px">
+    <div class="panel-title">请求序列</div>
+    <div class="step-counter" id="stepCounter">点击请求开始</div>
+    <div class="req-list" id="reqList"></div>
+    <div style="margin-top:10px">
+      <button class="btn" onclick="resetAll()">🔄 重置</button>
+    </div>
+  </div>
+  <div class="panel" style="flex:1">
+    <div class="panel-title">Radix Tree（KV Cache 缓存树）</div>
+    <div class="legend">
+      <div class="legend-item"><div class="dot" style="background:#4caf7d"></div>新插入</div>
+      <div class="legend-item"><div class="dot" style="background:#7c9ef8"></div>命中复用</div>
+      <div class="legend-item"><div class="dot" style="background:#888"></div>已缓存</div>
+    </div>
+    <div class="tree-area">
+      <svg class="tree" id="treeSvg" viewBox="0 0 500 260"></svg>
+    </div>
+    <div class="info-box" id="infoBox">
+      ← 选择左侧一个请求，观察树的变化和缓存命中情况
+    </div>
+  </div>
+</div>
+
+<script>
+// 模拟 6 个请求，展示不同的共享模式
+const REQUESTS = [
+  {
+    id: 1,
+    label: "请求①：系统提示 + 用户A问候",
+    tokens: ["[SYS]你是助手", "用户:你好", "助手:嗨！"],
+    desc: "首次请求，树为空，全部需要计算。\n结果插入树中作为缓存。",
+    // 树操作：插入从根到叶的路径
+  },
+  {
+    id: 2,
+    label: "请求②：用户A 第2轮",
+    tokens: ["[SYS]你是助手", "用户:你好", "助手:嗨！", "用户:天气怎样", "助手:今天晴"],
+    desc: "前3个token与请求①完全相同。\nRadixAttention 在树中找到公共前缀，直接复用 KV Cache！\n只需计算后2个新token。",
+  },
+  {
+    id: 3,
+    label: "请求③：用户B 新对话",
+    tokens: ["[SYS]你是助手", "用户:再见", "助手:拜拜"],
+    desc: "只共享系统提示部分（第1个token）。\n系统提示命中 ✓，后续用户B的内容需重新计算。",
+  },
+  {
+    id: 4,
+    label: "请求④：Few-shot 学习",
+    tokens: ["例子1:猫→喵", "例子2:狗→汪", "问:鸟→???"],
+    desc: "与前面的对话完全不同，没有共享前缀。\n从根节点分叉，新建独立分支。",
+  },
+  {
+    id: 5,
+    label: "请求⑤：同组Few-shot，不同问题",
+    tokens: ["例子1:猫→喵", "例子2:狗→汪", "问:鱼→???"],
+    desc: "与请求④共享前两个示例（公共前缀）！\n两个例子的 KV Cache 直接复用，只算最后一个token。",
+  },
+  {
+    id: 6,
+    label: "请求⑥：用户A 第3轮",
+    tokens: ["[SYS]你是助手", "用户:你好", "助手:嗨！", "用户:天气怎样", "助手:今天晴", "用户:谢谢"],
+    desc: "与请求②完全重叠（公共前缀5个token）。\n缓存命中率极高，几乎不需要重新计算！",
+  }
+];
+
+// 定义树结构（静态布局，每步累积）
+const TREE_STEPS = [
+  // 初始状态
+  { nodes: [{id:'root',x:250,y:20,label:'ROOT',color:'#555'}], edges: [] },
+  // 请求1后
+  {
+    nodes: [
+      {id:'root',x:250,y:20,label:'ROOT',color:'#888'},
+      {id:'n1',x:250,y:90,label:'[SYS]你是助手',color:'#4caf7d',new:true},
+      {id:'n2',x:250,y:155,label:'用户:你好 助手:嗨！',color:'#4caf7d',new:true},
+    ],
+    edges: [{from:'root',to:'n1'},{from:'n1',to:'n2'}],
+    hit:0, total:3, newNodes:['n1','n2']
+  },
+  // 请求2后
+  {
+    nodes: [
+      {id:'root',x:250,y:20,label:'ROOT',color:'#888'},
+      {id:'n1',x:250,y:90,label:'[SYS]你是助手',color:'#7c9ef8',hit:true},
+      {id:'n2',x:250,y:155,label:'用户:你好 助手:嗨！',color:'#7c9ef8',hit:true},
+      {id:'n3',x:250,y:220,label:'用户:天气 助手:晴',color:'#4caf7d',new:true},
+    ],
+    edges: [{from:'root',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'}],
+    hit:3, total:5, newNodes:['n3']
+  },
+  // 请求3后
+  {
+    nodes: [
+      {id:'root',x:250,y:20,label:'ROOT',color:'#888'},
+      {id:'n1',x:250,y:90,label:'[SYS]你是助手',color:'#7c9ef8',hit:true},
+      {id:'n2',x:160,y:160,label:'用户:你好 助手:嗨！',color:'#888'},
+      {id:'n3',x:160,y:225,label:'用户:天气 助手:晴',color:'#888'},
+      {id:'n4',x:340,y:160,label:'用户:再见 助手:拜拜',color:'#4caf7d',new:true},
+    ],
+    edges: [{from:'root',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n1',to:'n4'}],
+    hit:1, total:3, newNodes:['n4']
+  },
+  // 请求4后
+  {
+    nodes: [
+      {id:'root',x:250,y:20,label:'ROOT',color:'#888'},
+      {id:'n1',x:160,y:90,label:'[SYS]你是助手',color:'#888'},
+      {id:'n2',x:100,y:160,label:'用户:你好...',color:'#888'},
+      {id:'n3',x:100,y:225,label:'天气...',color:'#888'},
+      {id:'n4',x:210,y:160,label:'再见...',color:'#888'},
+      {id:'n5',x:370,y:90,label:'例子1:猫→喵',color:'#4caf7d',new:true},
+      {id:'n6',x:370,y:155,label:'例子2:狗→汪',color:'#4caf7d',new:true},
+      {id:'n7',x:370,y:220,label:'问:鸟→???',color:'#4caf7d',new:true},
+    ],
+    edges: [
+      {from:'root',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n1',to:'n4'},
+      {from:'root',to:'n5'},{from:'n5',to:'n6'},{from:'n6',to:'n7'}
+    ],
+    hit:0, total:3, newNodes:['n5','n6','n7']
+  },
+  // 请求5后
+  {
+    nodes: [
+      {id:'root',x:250,y:20,label:'ROOT',color:'#888'},
+      {id:'n1',x:160,y:90,label:'[SYS]你是助手',color:'#888'},
+      {id:'n2',x:100,y:160,label:'用户:你好...',color:'#888'},
+      {id:'n3',x:100,y:225,label:'天气...',color:'#888'},
+      {id:'n4',x:210,y:160,label:'再见...',color:'#888'},
+      {id:'n5',x:370,y:90,label:'例子1:猫→喵',color:'#7c9ef8',hit:true},
+      {id:'n6',x:370,y:155,label:'例子2:狗→汪',color:'#7c9ef8',hit:true},
+      {id:'n7',x:310,y:222,label:'问:鸟→???',color:'#888'},
+      {id:'n8',x:430,y:222,label:'问:鱼→???',color:'#4caf7d',new:true},
+    ],
+    edges: [
+      {from:'root',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n1',to:'n4'},
+      {from:'root',to:'n5'},{from:'n5',to:'n6'},{from:'n6',to:'n7'},{from:'n6',to:'n8'}
+    ],
+    hit:2, total:3, newNodes:['n8']
+  },
+  // 请求6后
+  {
+    nodes: [
+      {id:'root',x:250,y:20,label:'ROOT',color:'#888'},
+      {id:'n1',x:160,y:90,label:'[SYS]你是助手',color:'#7c9ef8',hit:true},
+      {id:'n2',x:100,y:160,label:'用户:你好 嗨！',color:'#7c9ef8',hit:true},
+      {id:'n3',x:70,y:225,label:'天气...晴',color:'#7c9ef8',hit:true},
+      {id:'n9',x:140,y:225,label:'谢谢',color:'#4caf7d',new:true},
+      {id:'n4',x:210,y:160,label:'再见...',color:'#888'},
+      {id:'n5',x:370,y:90,label:'例子1:猫→喵',color:'#888'},
+      {id:'n6',x:370,y:155,label:'例子2:狗→汪',color:'#888'},
+      {id:'n7',x:310,y:222,label:'鸟→???',color:'#888'},
+      {id:'n8',x:430,y:222,label:'鱼→???',color:'#888'},
+    ],
+    edges: [
+      {from:'root',to:'n1'},{from:'n1',to:'n2'},{from:'n2',to:'n3'},{from:'n2',to:'n9'},{from:'n1',to:'n4'},
+      {from:'root',to:'n5'},{from:'n5',to:'n6'},{from:'n6',to:'n7'},{from:'n6',to:'n8'}
+    ],
+    hit:5, total:6, newNodes:['n9']
+  },
+];
+
+let currentStep = 0;
+
+function drawTree(stepIdx) {
+  const svg = document.getElementById('treeSvg');
+  const step = TREE_STEPS[stepIdx];
+  const W = 500, H = 260;
+  
+  let html = '';
+  // edges
+  step.edges.forEach(e => {
+    const fn = step.nodes.find(n=>n.id===e.from);
+    const tn = step.nodes.find(n=>n.id===e.to);
+    if (!fn||!tn) return;
+    html += `<line x1="${fn.x}" y1="${fn.y+14}" x2="${tn.x}" y2="${tn.y-14}" stroke="#3a4060" stroke-width="1.5"/>`;
+  });
+  // nodes
+  step.nodes.forEach(n => {
+    const textLen = n.label.length * 6.5 + 16;
+    const w = Math.max(80, Math.min(textLen, 130));
+    const h = 26;
+    const rx = n.x - w/2, ry = n.y - h/2;
+    let fill = n.color || '#555';
+    let stroke = n.new ? '#4caf7d' : (n.hit ? '#7c9ef8' : '#3a4060');
+    let sw = (n.new || n.hit) ? 2 : 1;
+    html += `<rect x="${rx}" y="${ry}" width="${w}" height="${h}" rx="6" fill="${fill}22" stroke="${stroke}" stroke-width="${sw}"/>`;
+    html += `<text x="${n.x}" y="${n.y+4}" text-anchor="middle" fill="${n.color||'#888'}" font-size="10" font-family="monospace">${n.label.length>14?n.label.slice(0,13)+'…':n.label}</text>`;
+  });
+  svg.innerHTML = html;
+}
+
+function selectRequest(idx) {
+  currentStep = idx + 1;
+  document.querySelectorAll('.req-item').forEach((el,i) => el.classList.toggle('selected', i===idx));
+  document.getElementById('stepCounter').textContent = `步骤 ${currentStep}/6`;
+  
+  drawTree(currentStep);
+  
+  const req = REQUESTS[idx];
+  const step = TREE_STEPS[currentStep];
+  let hitHTML = '';
+  if (step.hit !== undefined) {
+    const saved = step.hit;
+    const total = step.total;
+    const pct = Math.round(saved/total*100);
+    hitHTML = `<br><span class="${saved>0?'hit':'miss'}">${saved>0?'✓ 命中':'✗ 未命中'}</span>：复用 <span class="saved">${saved}/${total}</span> 个token的KV Cache（节省 <span class="saved">${pct}%</span> prefill计算）`;
+  }
+  document.getElementById('infoBox').innerHTML = 
+    `<strong style="color:#c8d0f8">${req.label}</strong><br>` +
+    `<span style="color:#7c9ef8;font-family:monospace;font-size:11px">${req.tokens.join(' → ')}</span>` +
+    hitHTML + `<br><br>${req.desc.replace(/\n/g,'<br>')}`;
+}
+
+function resetAll() {
+  currentStep = 0;
+  drawTree(0);
+  document.querySelectorAll('.req-item').forEach(el => el.classList.remove('selected'));
+  document.getElementById('stepCounter').textContent = '点击请求开始';
+  document.getElementById('infoBox').innerHTML = '← 选择左侧一个请求，观察树的变化和缓存命中情况';
+}
+
+// 初始化请求列表
+const reqList = document.getElementById('reqList');
+REQUESTS.forEach((r,i) => {
+  const div = document.createElement('div');
+  div.className = 'req-item';
+  div.innerHTML = `<div class="label">${r.label.split('：')[0]}</div><div class="tokens">${r.tokens.slice(0,2).join(' | ')}${r.tokens.length>2?'…':''}</div>`;
+  div.onclick = () => selectRequest(i);
+  reqList.appendChild(div);
+});
+
+drawTree(0);
+</script>
+</body>
+</html>

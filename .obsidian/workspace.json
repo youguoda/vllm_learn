@@ -1,0 +1,226 @@
+{
+  "main": {
+    "id": "f08b08143a9fa96d",
+    "type": "split",
+    "children": [
+      {
+        "id": "b2d45790c769b8c5",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "944442bd53ca5689",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "SGLang与vLLM推理框架对比分享.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "SGLang与vLLM推理框架对比分享"
+            }
+          },
+          {
+            "id": "74038b898cf66963",
+            "type": "leaf",
+            "state": {
+              "type": "image",
+              "state": {
+                "file": "可视化/VLLM and SDLang/compressed-fsm-填表版.svg"
+              },
+              "icon": "lucide-image",
+              "title": "compressed-fsm-填表版"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "3e3f619c794b0f75",
+    "type": "split",
+    "children": [
+      {
+        "id": "7f5f3f83094bf568",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4146c5c4d42ee5c1",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "8a7aba9bce3ce54a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "14989d5b731447b7",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "21b244b4bf4b7423",
+    "type": "split",
+    "children": [
+      {
+        "id": "fb717bcbaf33bd5b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3399dbb6a041b8ac",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "可视化/VLLM and SDLang/compressed-fsm-填表版.svg",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "compressed-fsm-填表版 的反向链接列表"
+            }
+          },
+          {
+            "id": "b41a35099d60cea3",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "可视化/VLLM and SDLang/compressed-fsm-填表版.svg",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "compressed-fsm-填表版 的出链列表"
+            }
+          },
+          {
+            "id": "a28e7858e83c9a93",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "7f7999add7d61144",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "cc1d2c2aa0586201",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "可视化/VLLM and SDLang/compressed-fsm-填表版.svg",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "compressed-fsm-填表版 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "74038b898cf66963",
+  "lastOpenFiles": [
+    "可视化/VLLM and SDLang/paged_attention_block_table.svg",
+    "可视化/VLLM and SDLang/decode_memory_bound_and_kvcache_waste.svg",
+    "可视化/VLLM and SDLang/compressed-fsm-填表版.svg",
+    "学习日志/详细计划/04-28-整理笔记与初体验素材.md",
+    "可视化/VLLM and SDLang/vllm_three_pillars.svg",
+    "可视化/VLLM and SDLang/vllm_request_flow.html",
+    "可视化/VLLM and SDLang/vllm_paged_attention.html",
+    "可视化/VLLM and SDLang/vllm_ecosystem_de_facto_standard.svg",
+    "可视化/VLLM and SDLang/vllm_continuous_batching.html",
+    "可视化/VLLM and SDLang/vllm_apc_prefix_caching.html",
+    "可视化/VLLM and SDLang/radix树-抄作业版.svg",
+    "可视化/VLLM and SDLang/radix_tree_evolution_sglang.svg",
+    "可视化/VLLM and SDLang/radix_attention_interactive.html",
+    "可视化/VLLM and SDLang/pagedattention_flowchart.html",
+    "可视化/VLLM and SDLang/kvcache_architecture_comparison.html",
+    "可视化/VLLM and SDLang/compressed_fsm_interactive.html",
+    "可视化/VLLM and SDLang/api_speculative_execution.html",
+    "可视化/VLLM and SDLang",
+    "可视化/README.md",
+    "SGLang与vLLM推理框架对比分享.md",
+    "AGENTS.md",
+    "论文笔记-PagedAttention-vLLM.md",
+    "学习日志/RadixAttention多轮对话实验-06-13.md",
+    "学习日志/详细计划/05-08-架构对比图.md"
+  ]
+}

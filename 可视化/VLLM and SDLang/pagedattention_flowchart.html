@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PagedAttention 内存生命周期</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    background: #0d1117;
+    color: #c9d1d9;
+    min-height: 100vh;
+    padding: 24px 16px 40px;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .header h1 {
+    font-size: 17px;
+    font-weight: 600;
+    color: #e6edf3;
+    letter-spacing: 0.02em;
+    margin-bottom: 6px;
+  }
+  .header p {
+    font-size: 12px;
+    color: #6e7681;
+    font-family: sans-serif;
+  }
+
+  /* ── Phase nav tabs ── */
+  .phase-nav {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .phase-btn {
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: #161b22;
+    color: #8b949e;
+    font-size: 12px;
+    font-family: sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s;
+    white-space: nowrap;
+  }
+  .phase-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .phase-btn.active {
+    background: var(--phase-color);
+    border-color: var(--phase-color);
+    color: #0d1117;
+    font-weight: 700;
+  }
+
+  /* ── Main card ── */
+  .card {
+    max-width: 720px;
+    margin: 0 auto;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #21262d;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .phase-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--phase-color);
+    color: #0d1117;
+    letter-spacing: 0.05em;
+    font-family: sans-serif;
+  }
+  .card-header h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e6edf3;
+    font-family: sans-serif;
+  }
+
+  .card-body { padding: 24px; }
+
+  /* ── Flow diagram ── */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+  .node {
+    width: 100%;
+    max-width: 540px;
+    border-radius: 8px;
+    border: 1px solid var(--node-border, #30363d);
+    background: var(--node-bg, #1c2128);
+    padding: 12px 16px;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .node:hover { border-color: var(--phase-color); }
+  .node.oval {
+    border-radius: 40px;
+    text-align: center;
+    background: #21262d;
+    border-color: #444c56;
+    max-width: 260px;
+  }
+  .node.diamond {
+    border-radius: 6px;
+    background: var(--node-bg, #1c2128);
+    border-style: dashed;
+    border-width: 1px;
+    max-width: 420px;
+  }
+  .node-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e6edf3;
+    font-family: sans-serif;
+    margin-bottom: 3px;
+  }
+  .node-sub {
+    font-size: 11.5px;
+    color: #8b949e;
+    font-family: 'SF Mono', monospace;
+    line-height: 1.5;
+  }
+  .node-sub code {
+    color: #79c0ff;
+    background: #0d1117;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+
+  /* diamond label */
+  .diamond-label {
+    font-size: 11px;
+    color: #8b949e;
+    font-family: sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .yes-tag { color: #3fb950; font-weight: 700; }
+  .no-tag  { color: #f85149; font-weight: 700; }
+
+  /* connector arrow */
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 32px;
+    position: relative;
+  }
+  .arrow-line {
+    width: 1.5px;
+    flex: 1;
+    background: #30363d;
+  }
+  .arrow-head {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid #444c56;
+  }
+  .arrow-label {
+    position: absolute;
+    left: calc(50% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: #6e7681;
+    white-space: nowrap;
+    font-family: sans-serif;
+  }
+  .arrow.green .arrow-line { background: #238636; }
+  .arrow.green .arrow-head { border-top-color: #238636; }
+  .arrow.red .arrow-line   { background: #da3633; }
+  .arrow.red .arrow-head   { border-top-color: #da3633; }
+
+  /* branch row */
+  .branch-row {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    max-width: 540px;
+    justify-content: center;
+  }
+  .branch-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .branch-label {
+    font-size: 11px;
+    font-weight: 700;
+    font-family: sans-serif;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+  }
+  .branch-label.yes { background: #1a4426; color: #3fb950; }
+  .branch-label.no  { background: #3c1515; color: #f85149; }
+
+  /* loop-back indicator */
+  .loop-back {
+    width: 100%;
+    max-width: 540px;
+    border: 1px dashed #30363d;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: #6e7681;
+    font-family: sans-serif;
+    text-align: center;
+    margin-top: 4px;
+  }
+  .loop-back span { color: #8b949e; }
+
+  /* info box */
+  .info-box {
+    width: 100%;
+    max-width: 540px;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-left: 3px solid var(--phase-color);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 20px;
+  }
+  .info-box h4 {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+    font-family: sans-serif;
+  }
+  .info-box p {
+    font-size: 12px;
+    color: #8b949e;
+    line-height: 1.6;
+    font-family: sans-serif;
+  }
+  .info-box p strong { color: #e6edf3; }
+
+  /* stat pills */
+  .stat-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .stat {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-family: sans-serif;
+    color: #c9d1d9;
+  }
+  .stat strong { color: var(--phase-color); }
+
+  /* nav footer */
+  .nav-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px;
+    border-top: 1px solid #21262d;
+  }
+  .nav-btn {
+    padding: 7px 18px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: transparent;
+    color: #8b949e;
+    font-size: 12px;
+    font-family: sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .nav-btn:hover:not(:disabled) { border-color: var(--phase-color); color: var(--phase-color); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .progress-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #30363d;
+    transition: background 0.2s;
+  }
+  .dot.active { background: var(--phase-color); }
+
+  /* ── hidden phases ── */
+  .phase-panel { display: none; }
+  .phase-panel.visible { display: flex; flex-direction: column; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>PagedAttention 内存生命周期流程图</h1>
+  <p>点击各阶段标签切换 · 点击节点可深入了解细节</p>
+</div>
+
+<div class="phase-nav" id="phaseNav"></div>
+
+<div class="card" id="mainCard">
+  <div class="card-header">
+    <span class="phase-badge" id="phaseBadge"></span>
+    <h2 id="phaseTitle"></h2>
+  </div>
+  <div class="card-body">
+    <div class="flow" id="flowContent"></div>
+  </div>
+  <div class="nav-footer">
+    <button class="nav-btn" id="prevBtn" onclick="navigate(-1)">← 上一阶段</button>
+    <div class="progress-dots" id="dots"></div>
+    <button class="nav-btn" id="nextBtn" onclick="navigate(1)">下一阶段 →</button>
+  </div>
+</div>
+
+<script>
+const phases = [
+  {
+    id: 0,
+    color: '#58a6ff',
+    badge: '① 请求到达',
+    title: '调度决策 · Scheduler',
+    nodes: [
+      { type: 'oval', title: '请求到达 Scheduler', sub: null },
+      { type: 'arrow' },
+      { type: 'diamond', title: '有空闲物理块？', sub: 'GPU Block Allocator 查询 free pool 剩余数量',
+        yes: '有 → 进入 Prefill', no: '无 → 进入 Waiting Queue' },
+      { type: 'branch',
+        yes: { title: '进入 Prefill 阶段', sub: '分配物理块，立即处理' },
+        no:  { title: 'Waiting Queue', sub: '等待其他请求完成释放块后重试调度' }
+      },
+      { type: 'loop', text: '↻ Waiting Queue 中的请求在每个 iteration 结束后重新参与调度竞争，FCFS 顺序' },
+    ],
+    info: {
+      title: '关键设计',
+      text: '调度器采用 <strong>FCFS（先到先服务）</strong> 原则，保证公平性、防止饥饿。每个 decode iteration 结束后，调度器重新扫描 waiting queue，将可以服务的请求升入 running。'
+    },
+    stats: [
+      { label: '调度粒度', val: 'iteration 级' },
+      { label: '队列策略', val: 'FCFS' },
+      { label: '抢占目标', val: '最晚到达序列' },
+    ]
+  },
+  {
+    id: 1,
+    color: '#3fb950',
+    badge: '② Prefill',
+    title: 'Block 分配 · KV Cache 写入',
+    nodes: [
+      { type: 'oval', title: 'Prefill 开始', sub: null },
+      { type: 'arrow' },
+      { type: 'node', title: '计算所需 Block 数量',
+        sub: '⌈prompt_tokens / block_size⌉\n默认 block_size = 16 tokens / 块\n例：prompt = 7 tokens → 需 2 个块（Block 0 填 4 个，Block 1 填 3 个）' },
+      { type: 'arrow' },
+      { type: 'node', title: 'GPU Block Allocator 分配物理块',
+        sub: '从 free pool 取出 N 个物理块\n物理块无需连续 —— 可分散在 GPU DRAM 任意位置\n类比：酒店开房，不要求相邻' },
+      { type: 'arrow' },
+      { type: 'node', title: '写入 Block Table',
+        sub: 'logical_block_0 → phys_7   #filled=4\nlogical_block_1 → phys_1   #filled=3\n每个条目记录：物理块号 + 已用槽数' },
+      { type: 'arrow' },
+      { type: 'node', title: '执行标准 Self-Attention（矩阵 × 矩阵）',
+        sub: '所有 prompt token 同时并行处理（compute-bound）\n计算 K/V 向量并写入对应物理块的槽位\n与 decode 阶段的矩阵×向量本质不同' },
+      { type: 'arrow' },
+      { type: 'node', title: '生成第一个输出 token',
+        sub: 'KV 写入最后一个块剩余的空槽\n更新 Block Table：last block #filled += 1\n→ 进入 Decode 循环' },
+      { type: 'arrow' },
+      { type: 'oval', title: '→ Decode 循环', sub: null },
+    ],
+    info: {
+      title: '内存效率',
+      text: 'Prefill 结束时，<strong>物理块仅为已有 token 数量按需分配</strong>，不为最大序列长度预留。最多浪费 1 个未填满的块（≤15 个槽位），上限 ≤ 4%。'
+    },
+    stats: [
+      { label: '碎片上限', val: '< 4%' },
+      { label: '物理块要求', val: '非连续' },
+      { label: '计算模式', val: '矩阵 × 矩阵（并行）' },
+    ]
+  },
+  {
+    id: 2,
+    color: '#a371f7',
+    badge: '③ Decode 循环',
+    title: 'Autoregressive 生成 · 每 iteration 执行',
+    nodes: [
+      { type: 'oval', title: 'Decode iteration 开始', sub: null },
+      { type: 'arrow' },
+      { type: 'diamond', title: '最后一个 Block 已满？', sub: '#filled == block_size（16）？',
+        yes: '是 → 申请新物理块', no: '否 → 直接用当前块' },
+      { type: 'branch',
+        yes: { title: '申请新物理块', sub: 'Block Allocator 分配 → 写入 Block Table 新条目\n若 free pool 为空 → 触发 OOM 抢占分支' },
+        no:  { title: '使用当前块空槽', sub: '无需任何分配操作，直接进入 kernel' }
+      },
+      { type: 'arrow' },
+      { type: 'node', title: 'PagedAttention Kernel 执行',
+        sub: '① 查 Block Table → 获得所有物理块地址列表\n② 逐块读取 K、V（GPU warp 负责每块的 coalesced 读取）\n③ 分块计算 attention score Aᵢⱼ = softmax(qᵢᵀ Kⱼ / √d)\n④ 加权累加 oᵢ = Σ Vⱼ Aᵢⱼᵀ（数学等价于连续注意力）' },
+      { type: 'arrow' },
+      { type: 'node', title: '采样下一个 token，写入当前块空槽',
+        sub: '新 token 的 KV 向量写入当前 last block 的下一个空槽\n同时写入 Block Table：last_block.#filled += 1' },
+      { type: 'arrow' },
+      { type: 'diamond', title: '遇到 <eos> 或达到 max_length？', sub: '停止条件判断',
+        yes: '是 → 退出循环，进入释放阶段', no: '否 → 返回本循环顶部' },
+      { type: 'loop', text: '↻ 否 → 回到本循环顶部执行下一个 iteration（矩阵×向量，memory-bound）' },
+    ],
+    info: {
+      title: 'Kernel 额外开销',
+      text: 'PagedAttention kernel 相比连续存储的 FasterTransformer 多了<strong>查 Block Table + 非连续地址读取</strong>的开销，attention 算子延迟增加 <strong>20–26%</strong>。但该开销仅发生在 attention 层，不影响 Linear、FFN 等其他算子，端到端吞吐净胜 2–4×。'
+    },
+    stats: [
+      { label: 'Kernel 额外开销', val: '20–26%' },
+      { label: '计算模式', val: '矩阵 × 向量（memory-bound）' },
+      { label: '默认 block_size', val: '16 tokens' },
+    ]
+  },
+  {
+    id: 3,
+    color: '#f0883e',
+    badge: '⚠ OOM 抢占',
+    title: '内存不足 · 抢占 & 恢复',
+    nodes: [
+      { type: 'node', title: 'GPU 物理块耗尽（free pool 为空）',
+        sub: '在 Decode 循环中申请新块时触发\n调度器检测到无法满足当前 iteration 的块需求' },
+      { type: 'arrow' },
+      { type: 'node', title: '选择被抢占序列（FCFS — 最晚到达者先出）',
+        sub: 'All-or-Nothing 原则：整个序列的全部块一起驱逐\n原因：decode 时该序列所有块会被同时访问，驱逐一半毫无意义\n多序列请求（如 beam search）作为整体 gang-schedule，同进同出' },
+      { type: 'arrow' },
+      { type: 'diamond', title: '选择恢复策略', sub: '根据 block_size 和 PCIe 带宽决定',
+        yes: 'Swap Out → CPU RAM', no: 'Recompute（重新 Prefill）' },
+      { type: 'branch',
+        yes: { title: 'Swap Out', sub: '把该序列全部 KV 块搬到 CPU RAM\n大 block_size 时高效（减少 PCIe 小传输）\n空出 GPU 块后，被抢占序列进入 Waiting Queue' },
+        no:  { title: 'Recomputation', sub: '直接丢弃 KV cache\n恢复时：已生成 token 拼回 prompt，一次 prefill 并行重算\n比逐步 decode 快，OS 中无此对应物' }
+      },
+      { type: 'arrow' },
+      { type: 'node', title: '空出物理块，被抢占序列进入 Waiting Queue',
+        sub: '当前运行序列获得所需块，继续 Decode\n被抢占序列等待下次调度恢复' },
+      { type: 'loop', text: '↻ 被抢占序列恢复后从 Waiting Queue 重新进入调度，获得块后继续 Decode' },
+    ],
+    info: {
+      title: 'Swap vs Recompute 选择依据',
+      text: '<strong>小 block_size</strong>：PCIe 被大量小传输拖垮，Recompute 更快。<strong>大 block_size（≥64）</strong>：Swap 更高效，传输量收益明显。<strong>中间区间（16–64）</strong>：两者端到端性能接近。Recompute 开销从不超过 Swap 延迟的 20%。'
+    },
+    stats: [
+      { label: 'Swap 适用', val: 'block_size ≥ 64' },
+      { label: 'Recompute 适用', val: 'block_size ≤ 16' },
+      { label: '最坏额外延迟', val: 'Recompute ≤ 20% of Swap' },
+    ]
+  },
+  {
+    id: 4,
+    color: '#39d353',
+    badge: '④ Block 释放',
+    title: '引用计数归零 · 内存归还',
+    nodes: [
+      { type: 'oval', title: '序列生成完毕', sub: null },
+      { type: 'arrow' },
+      { type: 'node', title: '所有物理块 ref_count -= 1',
+        sub: '共享块（ref_count > 1）：仅减计数，不立即释放\n例：Parallel Sampling 中 5 个样本共享 prompt 块\n最后一个样本完成时 ref_count 才降至 0' },
+      { type: 'arrow' },
+      { type: 'diamond', title: 'ref_count == 0？', sub: '检查每个物理块的引用计数',
+        yes: '是 → 归还 Free Pool', no: '否 → 保留（仍有其他序列引用）' },
+      { type: 'branch',
+        yes: { title: 'ref_count == 0 → 归还 Free Pool', sub: 'Block Table 对应条目删除\n物理块立即可被下一个请求复用\n无 GC 延迟，O(1) 操作' },
+        no:  { title: '保留物理块', sub: '其他共享该块的序列仍在运行\n等它们各自完成后逐步减至 0' }
+      },
+      { type: 'arrow' },
+      { type: 'node', title: '响应返回客户端',
+        sub: '生成的 token 序列通过 FastAPI 接口（OpenAI 兼容）返回\nScheduler 接受新请求，使用释放出的物理块' },
+      { type: 'arrow' },
+      { type: 'oval', title: '完成', sub: null },
+    ],
+    info: {
+      title: '共享块释放举例',
+      text: 'Beam Search（宽度 4）中，4 条 beam 共享前缀 Block 0（ref=4）。Beam 0 淘汰：ref → 3。Beam 1 淘汰：ref → 2。Beam 2 完成：ref → 1。Beam 3 完成：ref → 0，<strong>此时 Block 0 才真正释放</strong>。整个过程节省内存 <strong>37–55%</strong>。'
+    },
+    stats: [
+      { label: '并行采样内存节省', val: '6–10%' },
+      { label: 'Beam Search 节省', val: '37–55%' },
+      { label: '释放复杂度', val: 'O(1)' },
+    ]
+  }
+];
+
+let current = 0;
+
+function phaseColor(id) { return phases[id].color; }
+
+function setPhaseColor(color) {
+  document.documentElement.style.setProperty('--phase-color', color);
+}
+
+function renderNav() {
+  const nav = document.getElementById('phaseNav');
+  nav.innerHTML = phases.map((p, i) => `
+    <button class="phase-btn ${i === current ? 'active' : ''}"
+      style="--phase-color:${p.color}"
+      onclick="goTo(${i})">${p.badge}</button>
+  `).join('');
+
+  const dots = document.getElementById('dots');
+  dots.innerHTML = phases.map((p, i) =>
+    `<div class="dot ${i === current ? 'active' : ''}" style="--phase-color:${p.color}"></div>`
+  ).join('');
+}
+
+function nodeHTML(n, color) {
+  if (n.type === 'arrow') {
+    return `<div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>`;
+  }
+  if (n.type === 'loop') {
+    return `<div class="loop-back"><span>${n.text}</span></div>`;
+  }
+  if (n.type === 'oval') {
+    return `<div class="node oval"><div class="node-title">${n.title}</div></div>`;
+  }
+  if (n.type === 'diamond') {
+    const sub = n.sub ? `<div class="node-sub">${n.sub}</div>` : '';
+    return `<div class="node diamond" style="--node-bg:#161b22;--node-border:${color}44">
+      <div class="node-title">◇ ${n.title}</div>
+      ${sub}
+      <div class="diamond-label">
+        <span class="yes-tag">是</span> → ${n.yes} &nbsp;|&nbsp;
+        <span class="no-tag">否</span> → ${n.no}
+      </div>
+    </div>`;
+  }
+  if (n.type === 'branch') {
+    return `<div class="branch-row">
+      <div class="branch-col">
+        <div class="branch-label yes">是</div>
+        <div class="node" style="--node-bg:#0d2818;--node-border:#238636">
+          <div class="node-title">${n.yes.title}</div>
+          <div class="node-sub" style="white-space:pre-line">${n.yes.sub}</div>
+        </div>
+      </div>
+      <div class="branch-col">
+        <div class="branch-label no">否</div>
+        <div class="node" style="--node-bg:#2d0e0e;--node-border:#6e3535">
+          <div class="node-title">${n.no.title}</div>
+          <div class="node-sub" style="white-space:pre-line">${n.no.sub}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  // default node
+  const sub = n.sub ? `<div class="node-sub" style="white-space:pre-line;margin-top:4px">${n.sub}</div>` : '';
+  return `<div class="node" style="--node-bg:#1c2128;--node-border:${color}55">
+    <div class="node-title">${n.title}</div>
+    ${sub}
+  </div>`;
+}
+
+function renderPhase() {
+  const p = phases[current];
+  setPhaseColor(p.color);
+  document.getElementById('phaseBadge').textContent = p.badge;
+  document.getElementById('phaseTitle').textContent = p.title;
+
+  const flow = document.getElementById('flowContent');
+  flow.innerHTML = p.nodes.map(n => nodeHTML(n, p.color)).join('');
+
+  // info box
+  const infoHTML = `
+    <div class="info-box">
+      <h4>${p.info.title}</h4>
+      <p>${p.info.text}</p>
+      <div class="stat-row">
+        ${p.stats.map(s => `<div class="stat"><strong>${s.val}</strong> ${s.label}</div>`).join('')}
+      </div>
+    </div>`;
+  flow.insertAdjacentHTML('beforeend', infoHTML);
+
+  document.getElementById('prevBtn').disabled = current === 0;
+  document.getElementById('nextBtn').disabled = current === phases.length - 1;
+  document.getElementById('nextBtn').textContent = current === phases.length - 1 ? '已是最后阶段' : '下一阶段 →';
+
+  renderNav();
+}
+
+function goTo(i) {
+  current = i;
+  renderPhase();
+  document.querySelector('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function navigate(dir) {
+  const next = current + dir;
+  if (next >= 0 && next < phases.length) goTo(next);
+}
+
+renderPhase();
+</script>
+</body>
+</html>

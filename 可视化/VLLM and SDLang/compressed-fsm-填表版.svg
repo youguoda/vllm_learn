@@ -1,0 +1,72 @@
+<svg width="680" viewBox="0 0 680 392" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif">
+<title>Compressed FSM 跳跃式解码示意图</title>
+<desc>JSON 固定字符（括号、字段名、引号、冒号）注定只有唯一答案，老办法逐个跑 forward 是浪费；Compressed FSM 把固定段整段跳过，只在真正要生成的内容上 forward，前向次数 21→6，JSON 吞吐约 1.6×。</desc>
+<style>
+.title{font-size:15px;font-weight:500;fill:#2C2C2A}
+.sub{font-size:13px;fill:#5F5E5A}
+.bd{font-size:13px;font-weight:500;fill:#2C2C2A}
+.ch{font-size:11px;fill:#2C2C2A}
+.amber{fill:#FAEEDA;stroke:#BA7517}
+.purple{fill:#EEEDFE;stroke:#534AB7}
+.teal{fill:#E1F5EE;stroke:#0F6E56}
+.tealtx{font-size:12px;font-weight:500;fill:#04342C}
+.mono{font-family:'SF Mono',Consolas,monospace;font-size:15px}
+</style>
+
+<text class="title" x="20" y="22">Compressed FSM：注定的字符整段跳过，只在要填的字上 forward</text>
+
+<rect x="20" y="34" width="640" height="34" rx="6" fill="#F1EFE8"/>
+<text class="mono" x="34" y="56"><tspan fill="#5F5E5A">{"summary": "</tspan><tspan fill="#534AB7">云存储很好用</tspan><tspan fill="#5F5E5A">"}</tspan></text>
+<text class="sub" x="430" y="56">灰=固定（注定）　紫=要生成的内容</text>
+
+<text class="bd" x="20" y="98">① 逐 token（老办法）：每个字符都跑一次 forward</text>
+<g>
+<rect class="amber" x="24" y="108" width="18" height="26" rx="3"/><text class="ch" x="33" y="125" text-anchor="middle">{</text>
+<rect class="amber" x="45" y="108" width="18" height="26" rx="3"/><text class="ch" x="54" y="125" text-anchor="middle">"</text>
+<rect class="amber" x="66" y="108" width="18" height="26" rx="3"/><text class="ch" x="75" y="125" text-anchor="middle">s</text>
+<rect class="amber" x="87" y="108" width="18" height="26" rx="3"/><text class="ch" x="96" y="125" text-anchor="middle">u</text>
+<rect class="amber" x="108" y="108" width="18" height="26" rx="3"/><text class="ch" x="117" y="125" text-anchor="middle">m</text>
+<rect class="amber" x="129" y="108" width="18" height="26" rx="3"/><text class="ch" x="138" y="125" text-anchor="middle">m</text>
+<rect class="amber" x="150" y="108" width="18" height="26" rx="3"/><text class="ch" x="159" y="125" text-anchor="middle">a</text>
+<rect class="amber" x="171" y="108" width="18" height="26" rx="3"/><text class="ch" x="180" y="125" text-anchor="middle">r</text>
+<rect class="amber" x="192" y="108" width="18" height="26" rx="3"/><text class="ch" x="201" y="125" text-anchor="middle">y</text>
+<rect class="amber" x="213" y="108" width="18" height="26" rx="3"/><text class="ch" x="222" y="125" text-anchor="middle">"</text>
+<rect class="amber" x="234" y="108" width="18" height="26" rx="3"/><text class="ch" x="243" y="125" text-anchor="middle">:</text>
+<rect class="amber" x="255" y="108" width="18" height="26" rx="3"/>
+<rect class="amber" x="276" y="108" width="18" height="26" rx="3"/><text class="ch" x="285" y="125" text-anchor="middle">"</text>
+<rect class="purple" x="297" y="108" width="18" height="26" rx="3"/><text class="ch" x="306" y="125" text-anchor="middle">云</text>
+<rect class="purple" x="318" y="108" width="18" height="26" rx="3"/><text class="ch" x="327" y="125" text-anchor="middle">存</text>
+<rect class="purple" x="339" y="108" width="18" height="26" rx="3"/><text class="ch" x="348" y="125" text-anchor="middle">储</text>
+<rect class="purple" x="360" y="108" width="18" height="26" rx="3"/><text class="ch" x="369" y="125" text-anchor="middle">很</text>
+<rect class="purple" x="381" y="108" width="18" height="26" rx="3"/><text class="ch" x="390" y="125" text-anchor="middle">好</text>
+<rect class="purple" x="402" y="108" width="18" height="26" rx="3"/><text class="ch" x="411" y="125" text-anchor="middle">用</text>
+<rect class="amber" x="423" y="108" width="18" height="26" rx="3"/><text class="ch" x="432" y="125" text-anchor="middle">"</text>
+<rect class="amber" x="444" y="108" width="18" height="26" rx="3"/><text class="ch" x="453" y="125" text-anchor="middle">}</text>
+</g>
+<text class="sub" x="24" y="152">固定 13 字：答案注定，却全是白跑的 forward</text>
+<text class="bd" x="500" y="125">= 21 次 forward</text>
+
+<text class="bd" x="20" y="200">② Compressed FSM：固定段整段跳过，只在内容上 forward</text>
+<rect class="teal" x="24" y="210" width="270" height="26" rx="4"/>
+<text class="tealtx" x="159" y="227" text-anchor="middle">固定前缀 一次跳过 · 0 forward</text>
+<rect class="purple" x="300" y="210" width="18" height="26" rx="3"/><text class="ch" x="309" y="227" text-anchor="middle">云</text>
+<rect class="purple" x="321" y="210" width="18" height="26" rx="3"/><text class="ch" x="330" y="227" text-anchor="middle">存</text>
+<rect class="purple" x="342" y="210" width="18" height="26" rx="3"/><text class="ch" x="351" y="227" text-anchor="middle">储</text>
+<rect class="purple" x="363" y="210" width="18" height="26" rx="3"/><text class="ch" x="372" y="227" text-anchor="middle">很</text>
+<rect class="purple" x="384" y="210" width="18" height="26" rx="3"/><text class="ch" x="393" y="227" text-anchor="middle">好</text>
+<rect class="purple" x="405" y="210" width="18" height="26" rx="3"/><text class="ch" x="414" y="227" text-anchor="middle">用</text>
+<rect class="teal" x="429" y="210" width="50" height="26" rx="4"/><text class="tealtx" x="454" y="227" text-anchor="middle">"} 跳过</text>
+<text class="sub" x="24" y="254">只在真正要生成的 6 个字上动脑子</text>
+<text class="bd" x="500" y="227">= 6 次 forward</text>
+
+<rect x="20" y="282" width="640" height="40" rx="8" fill="#E1F5EE" stroke="#0F6E56"/>
+<text class="tealtx" x="36" y="307" font-size="14">前向次数 21 → 6：省掉 15 次「答案早已注定」的空算　→　JSON 吞吐 ↑ 约 1.6×</text>
+
+<rect x="20" y="336" width="640" height="48" rx="8" fill="#F1EFE8"/>
+<rect class="amber" x="34" y="350" width="14" height="13" rx="3"/>
+<text class="sub" x="54" y="361">黄 = 注定的固定字符（括号/字段名/引号/冒号），逐个跑 forward 是浪费</text>
+<rect class="teal" x="34" y="368" width="14" height="13" rx="3"/>
+<text class="sub" x="54" y="379">绿 = 整段一次跳过（0 forward）</text>
+<rect class="purple" x="360" y="368" width="14" height="13" rx="3"/>
+<text class="sub" x="380" y="379">紫 = 真正要生成的内容（才需要 forward）</text>
+</svg>
