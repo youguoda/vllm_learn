@@ -1,0 +1,50 @@
+# bench_config.yaml — Week 6 全部对比实验的控制变量文档
+# 两框架启动参数必须严格对齐，每轮实验间重启 server 清残留
+
+model: "Qwen/Qwen2.5-1.5B"
+max_model_len: 4096
+gpu_memory_utilization: 0.85   # vLLM --gpu-memory-utilization / SGLang --mem-fraction-static
+
+ports:
+  vllm: 8000
+  sglang: 30000
+
+# 实验场景矩阵
+scenarios:
+  # 场景A：固定输出（测吞吐上限）— 05-29
+  fixed_output:
+    input_len: 256
+    output_len: 128
+    concurrency: [1, 4, 8, 16, 32]
+    n_requests: 40
+
+  # 场景B：延迟测试（TTFT 随输入长度变化）— 05-30
+  latency:
+    input_lens: [64, 256, 512, 1024, 2048]
+    output_len: 64
+    concurrency: 1
+    n_requests: 10
+
+  # 场景C：多轮对话（RadixAttention 主场）— 05-31
+  multi_turn:
+    n_turns: 5
+    system_prompt_tokens: 500
+    user_tokens_per_turn: 50
+    concurrency: [1, 8, 16]
+    n_dialogs: 20
+
+  # 场景D：流式输出 ITL（打字体验）— 05-31
+  streaming:
+    input_len: 256
+    output_len: 256
+    concurrency: [1, 4, 8]
+    n_requests: 20
+
+repeats: 3              # 每组重复，取中位数
+warmup_requests: 5     # 预热，不计入结果
+
+notes:
+  - "并发 >32 在 12GB 显存下严重排队，上限 32"
+  - "每轮实验间重启 server，清 EngineCore/sglang 残留进程"
+  - "两框架 max_model_len / 显存比例必须对齐"
+  - "ignore_eos=True 固定输出长度，保证吞吐可比"
