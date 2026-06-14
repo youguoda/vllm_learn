@@ -85,6 +85,53 @@ async def bench_latency(client, base, in_len, out_len, n_req):
             "e2e_median_ms": round(statistics.median(r["e2e"] for r in rs) * 1000, 1)}
 
 
+SYS_PROMPT = ("你是工业质检专家，精通振动分析、频谱分析、缺陷模式识别、"
+              "六西格玛和统计过程控制。") * 8  # ~500 token
+TURN_Q = ["轴承外圈剥落的振动特征是什么？", "如何用频谱分析定位故障位置？",
+          "采样频率应该如何选择？", "报警阈值设定有什么原则？",
+          "故障发展到什么程度需要立即停机？"]
+
+
+async def one_dialog(client, base, sem):
+    async with sem:
+        msgs = [{"role": "system", "content": SYS_PROMPT}]
+        ttfts = []
+        for q in TURN_Q:
+            msgs.append({"role": "user", "content": q})
+            r = await timed(client, base, msgs, 100, stream=True)
+            ttfts.append(r["ttft"])
+            msgs.append({"role": "assistant", "content": "(回答)"})
+        return ttfts
+
+
+async def bench_multi_turn(client, base, conc, n_dialogs=20):
+    sem = asyncio.Semaphore(conc)
+    t0 = time.perf_counter()
+    all_t = await asyncio.gather(*[one_dialog(client, base, sem) for _ in range(n_dialogs)])
+    wall = time.perf_counter() - t0
+    rows = []
+    for ti in range(len(TURN_Q)):
+        rows.append({"concurrency": conc, "turn": ti + 1,
+                     "ttft_median_ms": round(statistics.median(d[ti] for d in all_t) * 1000, 1)})
+    rows.append({"concurrency": conc, "turn": "rps",
+                 "ttft_median_ms": round(n_dialogs * len(TURN_Q) / wall, 2)})
+    return rows
+
+
+async def bench_streaming(client, base, conc, n_req=20):
+    sem = asyncio.Semaphore(conc)
+    msg = [{"role": "user", "content": "详细分析：" + filler(256)}]
+    async def one():
+        async with sem:
+            return await timed(client, base, msg, 256, stream=True)
+    rs = await asyncio.gather(*[one() for _ in range(n_req)])
+    itls = sorted(r["itl"] for r in rs)
+    return {"concurrency": conc,
+            "itl_p50_ms": round(itls[int(n_req * 0.50)] * 1000, 2),
+            "itl_p95_ms": round(itls[int(n_req * 0.95)] * 1000, 2),
+            "itl_p99_ms": round(itls[min(int(n_req * 0.99), n_req - 1)] * 1000, 2)}
+
+
 def save(fw, scenario, rows):
     out = OUT / f"{fw}_{scenario}.csv"
     with open(out, "w", newline="") as f:
@@ -118,6 +165,17 @@ async def main():
                 r = await bench_latency(client, base, il, 64, 10)
                 print(f"  输入{il:>5}: TTFT={r['ttft_median_ms']:>7}ms "
                       f"ITL={r['itl_median_ms']:>5}ms")
+                rows.append(r)
+        elif a.scenario == "multi_turn":
+            for conc in (1, 8, 16):
+                sub = await bench_multi_turn(client, base, conc)
+                for r in sub:
+                    print(f"  并发{conc:>2} 轮{r['turn']}: {r['ttft_median_ms']}")
+                rows.extend(sub)
+        elif a.scenario == "streaming":
+            for conc in (1, 4, 8):
+                r = await bench_streaming(client, base, conc)
+                print(f"  并发{conc}: ITL_p50={r['itl_p50_ms']}ms p95={r['itl_p95_ms']}ms")
                 rows.append(r)
         save(a.framework, a.scenario, rows)
 
