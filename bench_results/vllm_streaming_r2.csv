@@ -1,0 +1,4 @@
+framework,concurrency,itl_p50_ms,itl_p95_ms,itl_p99_ms
+vllm,1,11.01,11.13,11.13
+vllm,4,11.54,11.57,11.57
+vllm,8,11.71,11.72,11.72

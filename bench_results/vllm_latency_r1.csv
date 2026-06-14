@@ -1,0 +1,6 @@
+framework,input_len,ttft_median_ms,itl_median_ms,e2e_median_ms
+vllm,64,36.7,10.82,719.1
+vllm,256,67.6,10.81,748.4
+vllm,512,96.2,10.88,777.3
+vllm,1024,144.2,10.83,826.8
+vllm,2048,210.5,10.88,896.2

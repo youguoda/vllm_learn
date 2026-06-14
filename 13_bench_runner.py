@@ -76,9 +76,21 @@ async def bench_fixed(client, base, conc, n_req, in_len, out_len):
             "e2e_median_ms": round(statistics.median(r["e2e"] for r in rs) * 1000, 1)}
 
 
+def unique_filler(n_char):
+    # 用随机中文+数字避免重复触发 prefix cache，让 TTFT 真实反映 prefill
+    import random
+    pool = "工业传感器振动频谱故障诊断质检温度压力流量0123456789的是在和有"
+    return "".join(random.choices(pool, k=n_char))
+
+
 async def bench_latency(client, base, in_len, out_len, n_req):
-    msg = [{"role": "user", "content": "总结：" + filler(in_len)}]
-    rs = [await timed(client, base, msg, out_len, stream=True) for _ in range(n_req)]
+    import random
+    rs = []
+    for _ in range(n_req):
+        # 每次唯一输入, 禁止 prefix cache 命中, TTFT 反映真实 prefill
+        # 字符数≈token数(中文), 留余量避免超 max_model_len(4096)
+        msg = [{"role": "user", "content": f"[{random.randint(10**6,10**7)}]分析：" + unique_filler(min(in_len, 1500))}]
+        rs.append(await timed(client, base, msg, out_len, stream=True))
     return {"input_len": in_len,
             "ttft_median_ms": round(statistics.median(r["ttft"] for r in rs) * 1000, 1),
             "itl_median_ms": round(statistics.median(r["itl"] for r in rs) * 1000, 2),

@@ -1,0 +1,6 @@
+framework,input_len,ttft_median_ms,itl_median_ms,e2e_median_ms
+sglang,64,33.2,11.25,742.0
+sglang,256,64.5,11.29,776.5
+sglang,512,92.3,11.37,801.9
+sglang,1024,140.9,11.36,857.2
+sglang,2048,205.7,11.38,920.8
