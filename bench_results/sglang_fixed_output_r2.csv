@@ -1,0 +1,6 @@
+framework,concurrency,rps,tok_per_s,ttft_median_ms,ttft_p95_ms,itl_median_ms,e2e_median_ms
+sglang,1,0.68,87.2,27.4,29.0,11.33,1466.0
+sglang,4,2.61,333.6,28.5,31.1,11.84,1532.9
+sglang,8,5.06,648.3,39.0,41.9,12.12,1577.2
+sglang,16,7.57,969.1,56.3,62.0,13.95,1831.1
+sglang,32,10.51,1344.7,61.6,80.5,16.91,2225.6

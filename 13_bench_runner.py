@@ -132,8 +132,8 @@ async def bench_streaming(client, base, conc, n_req=20):
             "itl_p99_ms": round(itls[min(int(n_req * 0.99), n_req - 1)] * 1000, 2)}
 
 
-def save(fw, scenario, rows):
-    out = OUT / f"{fw}_{scenario}.csv"
+def save(fw, scenario, rows, suffix=""):
+    out = OUT / f"{fw}_{scenario}{suffix}.csv"
     with open(out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["framework"] + list(rows[0].keys()))
         w.writeheader()
@@ -146,6 +146,7 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--framework", choices=["vllm", "sglang"], required=True)
     ap.add_argument("--scenario", default="fixed_output")
+    ap.add_argument("--suffix", default="")
     a = ap.parse_args()
     base = BASE[a.framework]
 
@@ -177,7 +178,7 @@ async def main():
                 r = await bench_streaming(client, base, conc)
                 print(f"  并发{conc}: ITL_p50={r['itl_p50_ms']}ms p95={r['itl_p95_ms']}ms")
                 rows.append(r)
-        save(a.framework, a.scenario, rows)
+        save(a.framework, a.scenario, rows, a.suffix)
 
 
 if __name__ == "__main__":
