@@ -81,6 +81,20 @@ Model (Qwen2.5-1.5B): ~3 GiB VRAM. With `max_model_len=4096`: KV cache ~6 GiB, C
 - `学习日志/` — Daily learning logs (04-22 through 06-09, covering both SGLang and vLLM)
 - `AGENTS.md` — Stale; still says "currently empty", needs updating
 
+## Obsidian Skills (kepano/obsidian-skills)
+
+This repo doubles as an Obsidian vault (intended target). Project-level skills installed under `.agents/skills/`:
+
+| Skill | Trigger |
+|---|---|
+| `obsidian-markdown` | Editing `.md` in Obsidian flavor — wikilinks, callouts, embeds, properties |
+| `obsidian-bases` | `.base` files — database-like views, filters, formulas |
+| `json-canvas` | `.canvas` files — visual canvases, mind maps, flowcharts |
+| `obsidian-cli` | Vault ops via `obsidian` CLI — read/create/search notes, plugin dev |
+| `defuddle` | Clean markdown extraction from web URLs (token-efficient WebFetch alt) |
+
+**Prerequisite for `obsidian-cli`**: the `obsidian` command must resolve on PATH. It ships with the Obsidian **1.12+ installer** — enable it in Obsidian → Settings → "Command line interface" (see https://obsidian.md/cli). It talks to a *running* Obsidian instance, so Obsidian must be open; target a specific vault with `vault=<name>`. The other four skills are pure file-format knowledge and work without the CLI.
+
 ## References
 
 - vLLM source: https://github.com/vllm-project/vllm
