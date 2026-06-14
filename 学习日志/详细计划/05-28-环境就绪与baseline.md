@@ -118,7 +118,10 @@ if __name__ == "__main__":
 填写今天的环境快照和执行记录。
 
 ## 今日产出
-- [ ] healthcheck.sh（可复用）
-- [ ] 四个 baseline CSV（vllm/sglang × fixed_output/latency）
-- [ ] check_baseline.py 输出结果（数据合理性确认）
-- [ ] experiment_log.md 首条记录填写
+- [x] healthcheck.sh（可复用健康检查）
+- [x] 四个 baseline CSV（vllm/sglang × fixed_output/latency）
+- [x] check_baseline.py 输出（fixed_output 全 OK）
+- [x] experiment_log.md 记录
+
+> 完成于 2026-06-14。baseline 数据合理(并发1→32 RPS 0.7→11)。
+> 注：latency TTFT 平坦是 filler 文本重复触发 prefix cache 所致，05-30 用唯一长输入修正。
