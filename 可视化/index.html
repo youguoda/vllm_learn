@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vLLM vs SGLang 交互可视化</title>
+<style>
+  :root{--vllm:#4C72B0;--sglang:#55A868;--bg:#f7f8fa;--card:#fff;--ink:#222;--muted:#777;--warn:#C44E52;--gold:#E8A33D;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;}
+  header{background:linear-gradient(135deg,#1f4e79,#2d6a3e);color:#fff;padding:28px 20px;text-align:center;}
+  header h1{margin:0;font-size:26px;}
+  header p{margin:6px 0 0;opacity:.85;font-size:14px;}
+  nav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e3e6ea;display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+  nav button{border:0;background:#eef1f4;color:#445;padding:7px 12px;border-radius:18px;cursor:pointer;font-size:13px;transition:.15s;}
+  nav button:hover{background:#dde6ef;}
+  nav button.active{background:#1f4e79;color:#fff;}
+  main{max-width:980px;margin:0 auto;padding:18px;}
+  .card{background:var(--card);border-radius:14px;padding:22px 24px;margin-bottom:22px;box-shadow:0 2px 10px rgba(0,0,0,.05);display:none;}
+  .card.show{display:block;animation:fade .3s;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;}}
+  h2{margin:0 0 4px;font-size:21px;color:#1f4e79;}
+  .analogy{background:#fff8ec;border-left:4px solid var(--gold);padding:10px 14px;border-radius:6px;margin:12px 0;font-size:14px;}
+  .analogy b{color:#b9791a;}
+  .ctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;padding:12px;background:#f4f6f8;border-radius:8px;}
+  .ctl label{font-size:14px;font-weight:600;min-width:90px;}
+  input[type=range]{flex:1;min-width:160px;accent-color:#1f4e79;}
+  .val{font-variant-numeric:tabular-nums;font-weight:700;color:#1f4e79;min-width:54px;text-align:right;}
+  button.act{background:#1f4e79;color:#fff;border:0;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;}
+  button.act:hover{filter:brightness(1.1);}
+  button.act.green{background:#2d6a3e;}
+  button.act.ghost{background:#eef1f4;color:#1f4e79;}
+  .stat{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0;}
+  .stat .box{flex:1;min-width:130px;background:#f4f6f8;border-radius:10px;padding:12px 14px;text-align:center;}
+  .stat .box .n{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .stat .box .t{font-size:12px;color:var(--muted);margin-top:2px;}
+  .vllm-c{color:var(--vllm);} .sglang-c{color:var(--sglang);} .warn-c{color:var(--warn);}
+  svg{display:block;max-width:100%;}
+  .legend{font-size:12px;color:#555;display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:middle;margin-right:4px;}
+  .note{font-size:13px;color:var(--muted);margin-top:10px;}
+  .takeaway{margin-top:14px;padding:12px 14px;background:#eaf4ee;border-radius:8px;font-size:14px;border-left:4px solid var(--sglang);}
+  table.mini{border-collapse:collapse;font-size:13px;margin:8px 0;}
+  table.mini td,table.mini th{border:1px solid #e0e4e8;padding:4px 10px;text-align:center;}
+  table.mini th{background:#f0f3f6;}
+  .blk{display:inline-block;width:16px;height:22px;margin:1px;border-radius:2px;vertical-align:bottom;}
+  footer{text-align:center;color:#999;font-size:12px;padding:20px;}
+  code{background:#eef1f4;padding:1px 5px;border-radius:4px;font-size:13px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>vLLM vs SGLang 交互可视化</h1>
+  <p>拖一拖、点一点,亲手理解 KV Cache 的秘密 · 数据来自 RTX 3060 实测</p>
+</header>
+<nav id="nav"></nav>
+<main>
+
+<!-- ============ 1. 块 vs token ============ -->
+<section class="card" id="c1">
+  <h2>① 命中粒度:块 vs token(核心发现)</h2>
+  <div class="analogy">🍱 <b>类比</b>:vLLM 像<b>整箱搬货</b>——一箱 16 件,差 1 件也得整箱重搬;SGLang 像<b>散装抓取</b>——要几件拿几件,一件不浪费。</div>
+  <p style="font-size:14px">两个请求共享前缀,但第二个请求在<b>非整箱位置</b>截断。拖动截断点,看谁能救回更多 token。</p>
+  <div class="ctl">
+    <label>共享前缀长度</label>
+    <input type="range" id="s1" min="20" max="117" value="100">
+    <span class="val" id="v1">100</span><span style="font-size:13px;color:#777">token (共 117)</span>
+  </div>
+  <svg id="svg1" viewBox="0 0 920 200" height="200"></svg>
+  <div class="stat">
+    <div class="box"><div class="n vllm-c" id="h1v">96</div><div class="t">vLLM 命中 (块对齐, ÷16 向下取整)</div></div>
+    <div class="box"><div class="n sglang-c" id="h1s">100</div><div class="t">SGLang 命中 (token 级, 全部)</div></div>
+    <div class="box"><div class="n warn-c" id="h1d">4</div><div class="t">vLLM 多浪费的 token (块边界损失)</div></div>
+  </div>
+  <div class="takeaway" id="t1"></div>
+  <div class="note">实测锚点:117-token 共享前缀截断在非块边界时,vLLM 命中 96 (82.1%),SGLang 命中 111 (94.9%),差 15 token≈一个块。</div>
+</section>
+
+<!-- ============ 2. Radix 树 ============ -->
+<section class="card" id="c2">
+  <h2>② Radix 树演化:点击加请求看 split</h2>
+  <div class="analogy">🗺️ <b>类比</b>:像<b>地铁线路图</b>——共享的主干道(系统提示)只画一次,到岔路口才分叉。新线路来了,在分歧点"劈开"一站,共用前面的轨道。</div>
+  <p style="font-size:14px">三个请求共享系统提示 S。依次点击加入,看 radix 树如何 split 分叉、复用公共前缀。</p>
+  <div class="ctl">
+    <button class="act" onclick="radixStep()">▶ 加入下一个请求</button>
+    <button class="act ghost" onclick="radixReset()">↺ 重置</button>
+    <span id="r2msg" style="font-size:14px;color:#1f4e79;font-weight:600"></span>
+  </div>
+  <svg id="svg2" viewBox="0 0 920 320" height="320"></svg>
+  <div class="takeaway">公共前缀 <code>S</code> 全程只存一份,被多个请求共享。split 发生在任意 token 位置,不受 16-token 块边界约束——这就是 SGLang 命中粒度细的根源。</div>
+</section>
+
+<!-- ============ 3. 内存浪费 ============ -->
+<section class="card" id="c3">
+  <h2>③ KV Cache 内存浪费:传统 vs 分页</h2>
+  <div class="analogy">🅿️ <b>类比</b>:传统方案像<b>每辆车霸占一整排车位</b>(怕不够用先占满);PagedAttention 像<b>智能车位</b>——用几个格给几个,剩下的留给别人。</div>
+  <p style="font-size:14px">假设每个请求只实际用 50 token,但模型 max_len=4096。拖动请求数,看两种方案的浪费。</p>
+  <div class="ctl">
+    <label>并发请求数</label>
+    <input type="range" id="s3" min="1" max="20" value="10">
+    <span class="val" id="v3">10</span>
+  </div>
+  <div class="stat">
+    <div class="box"><div class="n warn-c" id="w3t">98.8%</div><div class="t">传统预留 浪费率</div></div>
+    <div class="box"><div class="n sglang-c" id="w3p">21.9%</div><div class="t">PagedAttention 浪费率</div></div>
+    <div class="box"><div class="n" id="w3x" style="color:#1f4e79">65×</div><div class="t">同显存可多服务请求数</div></div>
+  </div>
+  <svg id="svg3" viewBox="0 0 920 170" height="170"></svg>
+  <div class="takeaway">传统方案为"怕不够"预留 max_len 连续显存,实际用 50/4096 → 浪费 98.8%。分块按需分配只浪费最后一个不满块(≤15 token)→ 21.9%。同样显存,能服务的请求数差 <b>65 倍</b>。</div>
+</section>
+
+<!-- ============ 4. 链式哈希 ============ -->
+<section class="card" id="c4">
+  <h2>④ 链式哈希:改一个 token,下游全失效</h2>
+  <div class="analogy">🁢 <b>类比</b>:像<b>多米诺骨牌</b>——每块哈希都"压"在前一块上。前面倒一张(改一个 token),后面全部跟着倒(哈希全变,缓存全 miss)。</div>
+  <p style="font-size:14px">下面是 5 个 KV 块。点任意一个块"改动它",看哈希链如何从那里开始全部失效变红。</p>
+  <svg id="svg4" viewBox="0 0 920 150" height="150"></svg>
+  <div class="ctl">
+    <button class="act ghost" onclick="hashReset()">↺ 全部复原(命中)</button>
+    <span id="h4msg" style="font-size:14px;color:#1f4e79;font-weight:600"></span>
+  </div>
+  <div class="takeaway">链式哈希 <code>hash(块i)=f(hash(块i-1), 本块token)</code> 保证"哈希相同⟺前缀完全一致"。这就是为什么 system prompt 加一个随机字符,命中率直接归零——对应 06-13 实测。</div>
+</section>
+
+<!-- ============ 5. Continuous Batching ============ -->
+<section class="card" id="c5">
+  <h2>⑤ Continuous Batching:GPU 座位怎么填</h2>
+  <div class="analogy">🚗 <b>类比</b>:Static 像<b>包车</b>——必须等全车人都到齐才发车,有人下车了座位也空着;Continuous 像<b>拼车</b>——有人下车立刻拉新乘客上来,座位永不空。</div>
+  <div class="ctl">
+    <button class="act" id="cbBtn" onclick="cbToggle()">▶ 开始动画</button>
+    <button class="act ghost" onclick="cbMode()">切换模式: <b id="cbModeLbl">Continuous</b></button>
+  </div>
+  <svg id="svg5" viewBox="0 0 920 240" height="240"></svg>
+  <div class="stat">
+    <div class="box"><div class="n" id="cbUtil" style="color:#1f4e79">—</div><div class="t">GPU 座位利用率</div></div>
+    <div class="box"><div class="n" id="cbDone" style="color:#2d6a3e">0</div><div class="t">已完成请求</div></div>
+  </div>
+  <div class="takeaway">Static batching 要等整批最慢的完成才换下一批,短请求被长请求拖累、座位空等;Continuous batching 逐 step 调度,完成的立即移除、新请求随到随插——GPU 座位填得更满,吞吐更高。实测并发 1→5 吞吐涨 3 倍。</div>
+</section>
+
+<!-- ============ 6. 复用率→吞吐 ============ -->
+<section class="card" id="c6">
+  <h2>⑥ 前缀复用率 → 吞吐(你的 2.1x 是怎么来的)</h2>
+  <div class="analogy">📈 <b>类比</b>:复用率像<b>食堂预制菜比例</b>——大家点的菜重合越多,后厨提前备好的越能反复端,出餐越快。重合到 100% 时 SGLang 把这道菜只做一次全场共享。</div>
+  <p style="font-size:14px">拖动前缀复用率,看两框架的吞吐(RPS)曲线如何从重合到拉开。</p>
+  <div class="ctl">
+    <label>前缀复用率</label>
+    <input type="range" id="s6" min="0" max="100" value="0" step="25">
+    <span class="val" id="v6">0%</span>
+  </div>
+  <svg id="svg6" viewBox="0 0 920 300" height="300"></svg>
+  <div class="stat">
+    <div class="box"><div class="n vllm-c" id="r6v">7.31</div><div class="t">vLLM RPS</div></div>
+    <div class="box"><div class="n sglang-c" id="r6s">7.08</div><div class="t">SGLang RPS</div></div>
+    <div class="box"><div class="n" id="r6x" style="color:#2d6a3e">0.97×</div><div class="t">SGLang / vLLM</div></div>
+  </div>
+  <div class="takeaway" id="t6"></div>
+  <div class="note">实测数据(3 轮中位数):复用率 0% RPS 7.31/7.08(持平),100% 时 8.88/18.95(SGLang 2.1×)。这就是"复用率决定选型"的核心证据。</div>
+</section>
+
+</main>
+<footer>vLLM vs SGLang 学习项目 · 交互可视化 · 数据均为 RTX 3060 12GB + Qwen2.5-1.5B 本机实测</footer>
+
+<script>
+const SVGNS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function clear(s){while(s.firstChild)s.removeChild(s.firstChild);}
+
+/* ---- 导航 ---- */
+const cards=[["c1","①粒度"],["c2","②Radix树"],["c3","③内存浪费"],["c4","④链式哈希"],["c5","⑤批处理"],["c6","⑥复用率→吞吐"]];
+const nav=document.getElementById("nav");
+cards.forEach(([id,label],i)=>{const b=document.createElement("button");b.textContent=label;b.onclick=()=>show(id,b);nav.appendChild(b);});
+function show(id,btn){document.querySelectorAll(".card").forEach(c=>c.classList.remove("show"));document.getElementById(id).classList.add("show");document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));btn.classList.add("active");}
+show("c1",nav.children[0]);
+
+/* ============ 1. 块 vs token ============ */
+const BLOCK=16, TOTAL=117;
+const s1=document.getElementById("s1"),v1=document.getElementById("v1");
+function draw1(){
+  const shared=+s1.value; v1.textContent=shared;
+  const vllmHit=Math.floor(shared/BLOCK)*BLOCK;
+  const sgHit=shared;
+  const svg=document.getElementById("svg1");clear(svg);
+  const W=900,x0=10,cellW=W/TOTAL;
+  // 两行:vLLM / SGLang
+  [["vLLM",vllmHit,40,"#4C72B0"],["SGLang",sgHit,120,"#55A868"]].forEach(([name,hit,y,col])=>{
+    el("text",{x:x0,y:y-8,"font-size":13,"font-weight":700,fill:col},svg).textContent=name+" 命中 "+hit+" / "+shared;
+    for(let i=0;i<TOTAL;i++){
+      let fill="#e8ebee";
+      if(i<shared) fill = i<hit ? col : "#C44E52";   // 命中=色, 共享但没命中=红
+      el("rect",{x:x0+i*cellW,y:y,width:cellW-0.5,height:34,fill:fill,rx:1},svg);
+      if(i%BLOCK===0) el("line",{x1:x0+i*cellW,y1:y-3,x2:x0+i*cellW,y2:y+37,stroke:"#999","stroke-width":1,"stroke-dasharray":"2,2"},svg);
+    }
+  });
+  el("text",{x:x0,y:185,"font-size":12,fill:"#777"},svg).textContent="虚线 = 16-token 块边界 · 红色 = 共享了却没命中(被浪费)";
+  document.getElementById("h1v").textContent=vllmHit;
+  document.getElementById("h1s").textContent=sgHit;
+  const diff=sgHit-vllmHit;
+  document.getElementById("h1d").textContent=diff;
+  document.getElementById("t1").innerHTML = diff>0
+    ? `截断点落在块中间 → vLLM 尾部那 <b>${diff}</b> 个 token 因为块没填满,整块作废重算;SGLang 逐 token 命中,一个不丢。<b>vLLM 命中率 ${(vllmHit/shared*100).toFixed(1)}%,SGLang ${(sgHit/shared*100).toFixed(1)}%</b>。`
+    : `这次截断点恰好在块边界(${shared} 是 16 的倍数),两者都全命中——这种"刚好整箱"的情况现实中很少见。`;
+}
+s1.oninput=draw1; draw1();
+
+/* ============ 2. Radix 树 ============ */
+let radixState=0;
+const r2msg=document.getElementById("r2msg");
+function radixReset(){radixState=0;drawRadix();}
+function radixStep(){if(radixState<3)radixState++;drawRadix();}
+function drawRadix(){
+  const svg=document.getElementById("svg2");clear(svg);
+  const node=(x,y,txt,col,r=26)=>{el("circle",{cx:x,cy:y,r:r,fill:col,stroke:"#fff","stroke-width":2},svg);
+    el("text",{x:x,y:y+4,"font-size":12,"font-weight":700,fill:"#fff","text-anchor":"middle"},svg).textContent=txt;};
+  const edge=(x1,y1,x2,y2,lbl)=>{el("line",{x1,y1,x2,y2,stroke:"#bbb","stroke-width":2},svg);
+    el("text",{x:(x1+x2)/2+6,y:(y1+y2)/2,"font-size":11,fill:"#666"},svg).textContent=lbl;};
+  node(460,40,"root","#888",22);
+  const msgs=["点击「加入下一个请求」开始",
+    "R1 = S + \"轴承故障\":root 挂一条整边",
+    "R2 = S + \"齿轮磨损\":在 S 后 split 分叉,公共前缀 S 被复用",
+    "R3 = S + \"轴承寿命\":在「轴承」处再 split,三个请求层层共享"];
+  r2msg.textContent=msgs[radixState];
+  if(radixState>=1){ // S 节点
+    edge(460,62,460,110,"系统提示S"); node(460,135,"S","#1f4e79");
+    if(radixState===1){edge(460,161,460,210,"轴承故障"); node(460,235,"R1","#4C72B0");}
+  }
+  if(radixState>=2){
+    if(radixState===2){
+      edge(460,161,330,210,"轴承故障");node(330,235,"R1","#4C72B0");
+      edge(460,161,590,210,"齿轮磨损");node(590,235,"R2","#55A868");
+    }
+  }
+  if(radixState>=3){
+    // S -> 轴承 / 齿轮磨损
+    edge(460,161,360,205,"轴承");node(360,225,"轴承","#1f4e79",22);
+    edge(460,161,610,210,"齿轮磨损");node(610,235,"R2","#55A868");
+    // 轴承 -> 故障 / 寿命
+    edge(360,247,280,290,"故障");node(280,300,"R1","#4C72B0",20);
+    edge(360,247,440,290,"寿命");node(440,300,"R3","#C44E52",20);
+  }
+}
+drawRadix();
+
+/* ============ 3. 内存浪费 ============ */
+const s3=document.getElementById("s3"),v3=document.getElementById("v3");
+function draw3(){
+  const n=+s3.value;v3.textContent=n;
+  const svg=document.getElementById("svg3");clear(svg);
+  const used=50, maxlen=4096, blk=16;
+  const blocksNeeded=Math.ceil(used/blk); // 4 块
+  // 上排:传统(每请求一长条,大部分灰)
+  el("text",{x:10,y:20,"font-size":13,"font-weight":700,fill:"#C44E52"},svg).textContent="传统预留(每请求占 max_len=4096)";
+  const barW=880/n;
+  for(let i=0;i<n;i++){
+    el("rect",{x:10+i*barW,y:30,width:barW-2,height:40,fill:"#f0d0d2"},svg);
+    el("rect",{x:10+i*barW,y:30,width:(barW-2)*used/maxlen,height:40,fill:"#C44E52"},svg);
+  }
+  el("text",{x:10,y:90,"font-size":11,fill:"#777"},svg).textContent="深色=实际用(50) 浅色=预留浪费(4046)";
+  // 下排:分页(每请求4小块)
+  el("text",{x:10,y:118,"font-size":13,"font-weight":700,fill:"#55A868"},svg).textContent="PagedAttention(每请求只占 4 块=64 token)";
+  let bx=10;
+  for(let i=0;i<n;i++){for(let b=0;b<blocksNeeded;b++){el("rect",{x:bx,y:128,width:14,height:30,fill:"#55A868",rx:2},svg);bx+=15;}bx+=6;}
+  // 统计不随n变(比例固定),但显示真实
+  document.getElementById("w3t").textContent="98.8%";
+  document.getElementById("w3p").textContent="21.9%";
+  document.getElementById("w3x").textContent="65×";
+}
+s3.oninput=draw3; draw3();
+
+/* ============ 4. 链式哈希 ============ */
+let brokenAt=-1;
+const h4msg=document.getElementById("h4msg");
+function hashReset(){brokenAt=-1;drawHash();}
+function drawHash(){
+  const svg=document.getElementById("svg4");clear(svg);
+  const N=5,w=150,gap=20,x0=20,y=50;
+  for(let i=0;i<N;i++){
+    const broken = brokenAt>=0 && i>=brokenAt;
+    const col = broken ? "#C44E52" : "#55A868";
+    const x=x0+i*(w+gap);
+    const g=el("g",{style:"cursor:pointer"},svg);
+    g.addEventListener("click",()=>{brokenAt=i;drawHash();});
+    el("rect",{x:x,y:y,width:w,height:50,rx:8,fill:col,stroke:"#fff","stroke-width":2},g);
+    el("text",{x:x+w/2,y:y+22,"font-size":13,"font-weight":700,fill:"#fff","text-anchor":"middle"},g).textContent="KV 块 "+i;
+    el("text",{x:x+w/2,y:y+40,"font-size":11,fill:"#fff","text-anchor":"middle"},g).textContent=broken?"哈希失效 ✗":"命中 ✓";
+    if(i<N-1) el("text",{x:x+w+4,y:y+30,"font-size":18,fill:"#999"},svg).textContent="→";
+  }
+  el("text",{x:x0,y:130,"font-size":12,fill:"#777"},svg).textContent="点任意块=改动它的 token。哈希含前一块哈希,所以从它往后全部失效。";
+  h4msg.textContent = brokenAt<0 ? "全部命中(前缀完全一致)" : `改动了块 ${brokenAt} → 块 ${brokenAt}~4 哈希全变,这 ${5-brokenAt} 块全部 miss,要重算`;
+}
+drawHash();
+
+/* ============ 5. Continuous Batching ============ */
+let cbRunning=false,cbContinuous=true,cbTimer=null,cbSlots=[],cbDone=0,cbT=0;
+const SLOTS=6;
+function cbInit(){cbSlots=[];for(let i=0;i<SLOTS;i++)cbSlots.push(newReq());cbDone=0;cbT=0;}
+function newReq(){return {len:2+Math.floor(Math.random()*6),prog:0};}
+function cbMode(){cbContinuous=!cbContinuous;document.getElementById("cbModeLbl").textContent=cbContinuous?"Continuous":"Static";cbInit();drawCB();}
+function cbToggle(){cbRunning=!cbRunning;document.getElementById("cbBtn").textContent=cbRunning?"⏸ 暂停":"▶ 开始动画";if(cbRunning){if(!cbSlots.length)cbInit();cbTimer=setInterval(cbStep,500);}else clearInterval(cbTimer);}
+function cbStep(){
+  cbT++;
+  if(cbContinuous){
+    cbSlots.forEach(r=>{if(r){r.prog++;}});
+    cbSlots.forEach((r,i)=>{if(r&&r.prog>=r.len){cbDone++;cbSlots[i]=newReq();}});
+  }else{
+    // static: 全部跑,等全空了才换一批
+    let anyAlive=false;
+    cbSlots.forEach(r=>{if(r&&r.prog<r.len){r.prog++;}if(r&&r.prog<r.len)anyAlive=true;});
+    cbSlots.forEach((r,i)=>{if(r&&r.prog>=r.len){if(!r.finished){r.finished=true;}}});
+    if(!anyAlive && cbSlots.every(r=>r.finished)){cbDone+=SLOTS;cbInit();}
+  }
+  drawCB();
+}
+function drawCB(){
+  const svg=document.getElementById("svg5");clear(svg);
+  el("text",{x:10,y:20,"font-size":13,"font-weight":700,fill:"#1f4e79"},svg).textContent="GPU batch 槽位(每格一个请求,绿色=正在跑,灰色=空等)";
+  let filled=0;
+  cbSlots.forEach((r,i)=>{
+    const y=36+i*32;
+    const alive = r && r.prog<r.len;
+    if(alive)filled++;
+    el("rect",{x:10,y:y,width:120,height:26,rx:5,fill:alive?"#cde8d6":(r&&r.finished?"#eee":"#f0d0d2"),stroke:"#ccc"},svg);
+    el("text",{x:16,y:y+17,"font-size":11,fill:"#555"},svg).textContent="槽 "+(i+1);
+    if(r){
+      const barMax=300;
+      el("rect",{x:140,y:y+4,width:barMax,height:18,rx:4,fill:"#eef1f4"},svg);
+      el("rect",{x:140,y:y+4,width:barMax*Math.min(r.prog/r.len,1),height:18,rx:4,fill:alive?"#55A868":"#bbb"},svg);
+      el("text",{x:140+barMax+8,y:y+17,"font-size":11,fill:"#555"},svg).textContent=(r.prog>=r.len?"完成":r.prog+"/"+r.len);
+    }
+  });
+  const util=Math.round(filled/SLOTS*100);
+  document.getElementById("cbUtil").textContent=util+"%";
+  document.getElementById("cbDone").textContent=cbDone;
+}
+cbInit();drawCB();
+
+/* ============ 6. 复用率→吞吐 ============ */
+// 实测数据
+const REUSE=[0,25,50,75,100];
+const VLLM_RPS=[7.31,7.61,7.88,8.21,8.88];
+const SG_RPS=[7.08,7.51,7.45,8.05,18.95];
+const s6=document.getElementById("s6"),v6=document.getElementById("v6");
+function draw6(){
+  const r=+s6.value;v6.textContent=r+"%";
+  const idx=REUSE.indexOf(r);
+  const svg=document.getElementById("svg6");clear(svg);
+  const x0=70,y0=250,W=800,H=210,maxRps=20;
+  // 轴
+  el("line",{x1:x0,y1:y0,x2:x0+W,y2:y0,stroke:"#999"},svg);
+  el("line",{x1:x0,y1:y0,x2:x0,y2:y0-H,stroke:"#999"},svg);
+  el("text",{x:x0+W/2,y:y0+38,"font-size":13,"text-anchor":"middle",fill:"#555"},svg).textContent="前缀复用率";
+  el("text",{x:20,y:y0-H/2,"font-size":13,fill:"#555",transform:`rotate(-90,20,${y0-H/2})`},svg).textContent="吞吐 RPS";
+  for(let g=0;g<=20;g+=5){const yy=y0-H*g/maxRps;el("line",{x1:x0,y1:yy,x2:x0+W,y2:yy,stroke:"#eee"},svg);el("text",{x:x0-22,y:yy+4,"font-size":10,fill:"#999"},svg).textContent=g;}
+  const px=i=>x0+W*REUSE[i]/100, py=val=>y0-H*val/maxRps;
+  const drawLine=(data,col)=>{let d="";data.forEach((val,i)=>{d+=(i?"L":"M")+px(i)+","+py(val);});el("path",{d:d,fill:"none",stroke:col,"stroke-width":3},svg);
+    data.forEach((val,i)=>el("circle",{cx:px(i),cy:py(val),r:i===idx?7:4,fill:col,stroke:i===idx?"#fff":col,"stroke-width":i===idx?2:0},svg));};
+  drawLine(VLLM_RPS,"#4C72B0");drawLine(SG_RPS,"#55A868");
+  REUSE.forEach((rr,i)=>el("text",{x:px(i),y:y0+18,"font-size":11,"text-anchor":"middle",fill:i===idx?"#1f4e79":"#999","font-weight":i===idx?700:400},svg).textContent=rr+"%");
+  // 高亮竖线
+  el("line",{x1:px(idx),y1:y0,x2:px(idx),y2:y0-H,stroke:"#1f4e79","stroke-width":1,"stroke-dasharray":"3,3"},svg);
+  document.getElementById("r6v").textContent=VLLM_RPS[idx].toFixed(2);
+  document.getElementById("r6s").textContent=SG_RPS[idx].toFixed(2);
+  const ratio=SG_RPS[idx]/VLLM_RPS[idx];
+  document.getElementById("r6x").textContent=ratio.toFixed(2)+"×";
+  document.getElementById("r6x").style.color = ratio>1.3?"#2d6a3e":"#888";
+  document.getElementById("t6").innerHTML = r<75
+    ? `复用率 ${r}%:两条曲线<b>几乎重合</b>(SGLang/vLLM=${ratio.toFixed(2)}×)。无/低复用时两框架持平,甚至 vLLM 略优。`
+    : (r===100
+      ? `复用率 100%:SGLang 吞吐<b style="color:#2d6a3e">暴涨到 2.1×</b>!所有请求共享同一长前缀,radix 树让这段 KV 只算一次全场共享 → 这就是你实测的核心发现。`
+      : `复用率 ${r}%:开始拉开(${ratio.toFixed(2)}×),SGLang 的缓存粒度优势显现。`);
+}
+s6.oninput=draw6; draw6();
+</script>
+</body>
+</html>
