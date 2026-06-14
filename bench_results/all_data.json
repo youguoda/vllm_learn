@@ -1,0 +1,454 @@
+{
+  "fixed_output": {
+    "vllm": [
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "rps": 0.7,
+        "tok_per_s": 90.2,
+        "ttft_median_ms": 30.0,
+        "ttft_p95_ms": 32.5,
+        "itl_median_ms": 10.92,
+        "e2e_median_ms": 1418.2
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 4.0,
+        "rps": 2.68,
+        "tok_per_s": 343.2,
+        "ttft_median_ms": 33.5,
+        "ttft_p95_ms": 39.7,
+        "itl_median_ms": 11.46,
+        "e2e_median_ms": 1489.3
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "rps": 5.27,
+        "tok_per_s": 674.4,
+        "ttft_median_ms": 41.7,
+        "ttft_p95_ms": 44.3,
+        "itl_median_ms": 11.61,
+        "e2e_median_ms": 1516.5
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 16.0,
+        "rps": 8.52,
+        "tok_per_s": 1090.6,
+        "ttft_median_ms": 41.3,
+        "ttft_p95_ms": 50.9,
+        "itl_median_ms": 12.11,
+        "e2e_median_ms": 1586.9
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 32.0,
+        "rps": 11.27,
+        "tok_per_s": 1443.2,
+        "ttft_median_ms": 67.3,
+        "ttft_p95_ms": 69.7,
+        "itl_median_ms": 15.4,
+        "e2e_median_ms": 2024.2
+      }
+    ],
+    "sglang": [
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "rps": 0.68,
+        "tok_per_s": 87.2,
+        "ttft_median_ms": 27.4,
+        "ttft_p95_ms": 29.4,
+        "itl_median_ms": 11.33,
+        "e2e_median_ms": 1466.0
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 4.0,
+        "rps": 2.61,
+        "tok_per_s": 333.6,
+        "ttft_median_ms": 28.5,
+        "ttft_p95_ms": 31.1,
+        "itl_median_ms": 11.85,
+        "e2e_median_ms": 1532.9
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "rps": 5.06,
+        "tok_per_s": 648.3,
+        "ttft_median_ms": 39.0,
+        "ttft_p95_ms": 42.2,
+        "itl_median_ms": 12.12,
+        "e2e_median_ms": 1577.2
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 16.0,
+        "rps": 7.64,
+        "tok_per_s": 977.5,
+        "ttft_median_ms": 55.6,
+        "ttft_p95_ms": 64.3,
+        "itl_median_ms": 13.84,
+        "e2e_median_ms": 1812.5
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 32.0,
+        "rps": 10.49,
+        "tok_per_s": 1342.2,
+        "ttft_median_ms": 67.5,
+        "ttft_p95_ms": 80.5,
+        "itl_median_ms": 17.06,
+        "e2e_median_ms": 2246.4
+      }
+    ]
+  },
+  "latency": {
+    "vllm": [
+      {
+        "framework": "vllm",
+        "input_len": 64.0,
+        "ttft_median_ms": 37.2,
+        "itl_median_ms": 10.82,
+        "e2e_median_ms": 719.1
+      },
+      {
+        "framework": "vllm",
+        "input_len": 256.0,
+        "ttft_median_ms": 67.6,
+        "itl_median_ms": 10.81,
+        "e2e_median_ms": 748.4
+      },
+      {
+        "framework": "vllm",
+        "input_len": 512.0,
+        "ttft_median_ms": 96.5,
+        "itl_median_ms": 10.86,
+        "e2e_median_ms": 777.3
+      },
+      {
+        "framework": "vllm",
+        "input_len": 1024.0,
+        "ttft_median_ms": 145.3,
+        "itl_median_ms": 10.85,
+        "e2e_median_ms": 828.5
+      },
+      {
+        "framework": "vllm",
+        "input_len": 2048.0,
+        "ttft_median_ms": 211.9,
+        "itl_median_ms": 10.88,
+        "e2e_median_ms": 896.5
+      }
+    ],
+    "sglang": [
+      {
+        "framework": "sglang",
+        "input_len": 64.0,
+        "ttft_median_ms": 33.4,
+        "itl_median_ms": 11.26,
+        "e2e_median_ms": 742.8
+      },
+      {
+        "framework": "sglang",
+        "input_len": 256.0,
+        "ttft_median_ms": 65.0,
+        "itl_median_ms": 11.29,
+        "e2e_median_ms": 776.5
+      },
+      {
+        "framework": "sglang",
+        "input_len": 512.0,
+        "ttft_median_ms": 93.0,
+        "itl_median_ms": 11.36,
+        "e2e_median_ms": 805.8
+      },
+      {
+        "framework": "sglang",
+        "input_len": 1024.0,
+        "ttft_median_ms": 140.9,
+        "itl_median_ms": 11.36,
+        "e2e_median_ms": 857.2
+      },
+      {
+        "framework": "sglang",
+        "input_len": 2048.0,
+        "ttft_median_ms": 205.7,
+        "itl_median_ms": 11.45,
+        "e2e_median_ms": 927.3
+      }
+    ]
+  },
+  "multi_turn": {
+    "vllm": [
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "turn": 1.0,
+        "ttft_median_ms": 31.6
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "turn": 2.0,
+        "ttft_median_ms": 31.6
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "turn": 3.0,
+        "ttft_median_ms": 31.5
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "turn": 4.0,
+        "ttft_median_ms": 31.3
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "turn": 5.0,
+        "ttft_median_ms": 32.1
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "turn": "rps",
+        "ttft_median_ms": 0.9
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "turn": 1.0,
+        "ttft_median_ms": 44.0
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "turn": 2.0,
+        "ttft_median_ms": 48.6
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "turn": 3.0,
+        "ttft_median_ms": 50.1
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "turn": 4.0,
+        "ttft_median_ms": 47.6
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "turn": 5.0,
+        "ttft_median_ms": 51.4
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "turn": "rps",
+        "ttft_median_ms": 5.56
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 16.0,
+        "turn": 1.0,
+        "ttft_median_ms": 59.7
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 16.0,
+        "turn": 2.0,
+        "ttft_median_ms": 62.2
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 16.0,
+        "turn": 3.0,
+        "ttft_median_ms": 65.1
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 16.0,
+        "turn": 4.0,
+        "ttft_median_ms": 56.8
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 16.0,
+        "turn": 5.0,
+        "ttft_median_ms": 73.3
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 16.0,
+        "turn": "rps",
+        "ttft_median_ms": 8.11
+      }
+    ],
+    "sglang": [
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "turn": 1.0,
+        "ttft_median_ms": 27.4
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "turn": 2.0,
+        "ttft_median_ms": 27.2
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "turn": 3.0,
+        "ttft_median_ms": 27.9
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "turn": 4.0,
+        "ttft_median_ms": 27.2
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "turn": 5.0,
+        "ttft_median_ms": 27.8
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "turn": "rps",
+        "ttft_median_ms": 0.87
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "turn": 1.0,
+        "ttft_median_ms": 31.1
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "turn": 2.0,
+        "ttft_median_ms": 40.1
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "turn": 3.0,
+        "ttft_median_ms": 39.5
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "turn": 4.0,
+        "ttft_median_ms": 40.0
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "turn": 5.0,
+        "ttft_median_ms": 39.9
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "turn": "rps",
+        "ttft_median_ms": 5.43
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 16.0,
+        "turn": 1.0,
+        "ttft_median_ms": 57.7
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 16.0,
+        "turn": 2.0,
+        "ttft_median_ms": 58.4
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 16.0,
+        "turn": 3.0,
+        "ttft_median_ms": 55.0
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 16.0,
+        "turn": 4.0,
+        "ttft_median_ms": 57.4
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 16.0,
+        "turn": 5.0,
+        "ttft_median_ms": 55.2
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 16.0,
+        "turn": "rps",
+        "ttft_median_ms": 7.45
+      }
+    ]
+  },
+  "streaming": {
+    "vllm": [
+      {
+        "framework": "vllm",
+        "concurrency": 1.0,
+        "itl_p50_ms": 11.01,
+        "itl_p95_ms": 11.08,
+        "itl_p99_ms": 11.08
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 4.0,
+        "itl_p50_ms": 11.54,
+        "itl_p95_ms": 11.58,
+        "itl_p99_ms": 11.58
+      },
+      {
+        "framework": "vllm",
+        "concurrency": 8.0,
+        "itl_p50_ms": 11.71,
+        "itl_p95_ms": 11.73,
+        "itl_p99_ms": 11.73
+      }
+    ],
+    "sglang": [
+      {
+        "framework": "sglang",
+        "concurrency": 1.0,
+        "itl_p50_ms": 11.35,
+        "itl_p95_ms": 11.46,
+        "itl_p99_ms": 11.46
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 4.0,
+        "itl_p50_ms": 11.9,
+        "itl_p95_ms": 11.98,
+        "itl_p99_ms": 11.98
+      },
+      {
+        "framework": "sglang",
+        "concurrency": 8.0,
+        "itl_p50_ms": 12.14,
+        "itl_p95_ms": 12.2,
+        "itl_p99_ms": 12.2
+      }
+    ]
+  }
+}
